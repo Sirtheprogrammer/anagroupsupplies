@@ -27,6 +27,7 @@ import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import AdminOrders from './pages/AdminOrders';
 import AdminProducts from './pages/AdminProducts';
+import AdminUsers from './pages/AdminUsers';
 import AddProduct from './pages/AddProduct';
 import EditProduct from './pages/EditProduct';
 
@@ -95,6 +96,11 @@ function App() {
                   <Route path="/admin/orders" element={
                     <ProtectedRoute adminOnly>
                       <AdminOrders />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/users" element={
+                    <ProtectedRoute adminOnly>
+                      <AdminUsers />
                     </ProtectedRoute>
                   } />
                   <Route path="/login" element={<Login />} />
