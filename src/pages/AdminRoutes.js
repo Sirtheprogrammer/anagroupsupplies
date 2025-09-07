@@ -4,6 +4,7 @@ import AdminProducts from './AdminProducts';
 import AdminUsers from './AdminUsers';
 import AddProduct from './AddProduct';
 import EditProduct from './EditProduct';
+import AdminOrders from './AdminOrders';
 
 const AdminRoutes = () => {
   return (
@@ -13,6 +14,7 @@ const AdminRoutes = () => {
       <Route path="/products/add" element={<AddProduct />} />
       <Route path="/products/edit/:id" element={<EditProduct />} />
       <Route path="/users" element={<AdminUsers />} />
+      <Route path="/orders" element={<AdminOrders />} />
     </Routes>
   );
 };

@@ -45,35 +45,68 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      
-      // Fetch users
-      const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-      const usersSnapshot = await getDocs(usersQuery);
-      const usersList = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt || new Date().toISOString(),
-        lastLogin: doc.data().lastLogin || null,
-        isActive: doc.data().isActive !== false,
-        role: doc.data().role || 'user'
-      }));
+
+      console.log('Fetching users from Firestore...');
+
+      // First try with ordering, fallback to simple query if it fails
+      let usersSnapshot;
+      try {
+        const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+        usersSnapshot = await getDocs(usersQuery);
+        console.log('Users fetched with ordering:', usersSnapshot.size);
+      } catch (orderError) {
+        console.warn('OrderBy query failed, falling back to simple query:', orderError);
+        usersSnapshot = await getDocs(collection(db, 'users'));
+        console.log('Users fetched without ordering:', usersSnapshot.size);
+      }
+
+      const usersList = usersSnapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('User data:', doc.id, data);
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt || new Date().toISOString(),
+          lastLogin: data.lastLogin || null,
+          isActive: data.isActive !== false,
+          role: data.role || 'user'
+        };
+      });
+
+      console.log('Processed users list:', usersList.length);
 
       // Calculate stats
       const now = new Date();
       const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      
+
       const stats = {
         total: usersList.length,
         active: usersList.filter(u => u.isActive).length,
         admins: usersList.filter(u => u.role === 'admin').length,
-        newThisMonth: usersList.filter(u => new Date(u.createdAt) >= thisMonth).length
+        newThisMonth: usersList.filter(u => {
+          try {
+            return new Date(u.createdAt) >= thisMonth;
+          } catch (e) {
+            console.warn('Invalid date for user:', u.id, u.createdAt);
+            return false;
+          }
+        }).length
       };
+
+      console.log('Calculated stats:', stats);
 
       setUsers(usersList);
       setUserStats(stats);
+
+      if (usersList.length === 0) {
+        console.warn('No users found in database');
+        toast.info('No users found in the system');
+      } else {
+        console.log(`Successfully loaded ${usersList.length} users`);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to fetch users');
+      toast.error(`Failed to fetch users: ${error.message}`);
     } finally {
       setLoading(false);
     }

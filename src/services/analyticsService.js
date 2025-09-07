@@ -1,41 +1,47 @@
-import { collection, addDoc, getDocs, query, where, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 class AnalyticsService {
   constructor() {
-    this.sessionId = this.generateSessionId();
-    this.userId = null;
-    this.startTime = Date.now();
-  }
-
-  generateSessionId() {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.currentUserId = null;
+    this.sessionStart = Date.now();
   }
 
   setUser(userId) {
-    this.userId = userId;
+    this.currentUserId = userId;
+  }
+
+  // Track user registration
+  async trackRegistration(userId, method = 'email') {
+    try {
+      await addDoc(collection(db, 'analytics'), {
+        type: 'registration',
+        userId,
+        method,
+        timestamp: Timestamp.now(),
+        metadata: {
+          userAgent: navigator.userAgent,
+          referrer: document.referrer,
+          url: window.location.href
+        }
+      });
+    } catch (error) {
+      console.error('Error tracking registration:', error);
+    }
   }
 
   // Track user login
-  async trackLogin(userId, loginMethod = 'email') {
+  async trackLogin(userId, method = 'email') {
     try {
       await addDoc(collection(db, 'analytics'), {
         type: 'login',
         userId,
-        sessionId: this.sessionId,
-        loginMethod,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        platform: this.getPlatform()
+        method,
+        timestamp: Timestamp.now(),
+        metadata: {
+          sessionDuration: Date.now() - this.sessionStart
+        }
       });
-
-      // Update user's last login
-      await updateDoc(doc(db, 'users', userId), {
-        lastLogin: new Date().toISOString(),
-        isActive: true
-      });
-
-      this.setUser(userId);
     } catch (error) {
       console.error('Error tracking login:', error);
     }
@@ -44,31 +50,32 @@ class AnalyticsService {
   // Track user logout
   async trackLogout(userId) {
     try {
-      const sessionDuration = Date.now() - this.startTime;
-      
       await addDoc(collection(db, 'analytics'), {
         type: 'logout',
         userId,
-        sessionId: this.sessionId,
-        sessionDuration,
-        timestamp: new Date().toISOString()
+        timestamp: Timestamp.now(),
+        metadata: {
+          sessionDuration: Date.now() - this.sessionStart
+        }
       });
+      this.sessionStart = Date.now(); // Reset for next session
     } catch (error) {
       console.error('Error tracking logout:', error);
     }
   }
 
   // Track page views
-  async trackPageView(userId, pagePath, pageTitle) {
+  async trackPageView(userId, path, title) {
     try {
       await addDoc(collection(db, 'analytics'), {
         type: 'page_view',
         userId,
-        sessionId: this.sessionId,
-        pagePath,
-        pageTitle,
-        timestamp: new Date().toISOString(),
-        referrer: document.referrer
+        path,
+        title,
+        timestamp: Timestamp.now(),
+        metadata: {
+          referrer: document.referrer
+        }
       });
     } catch (error) {
       console.error('Error tracking page view:', error);
@@ -81,12 +88,11 @@ class AnalyticsService {
       await addDoc(collection(db, 'analytics'), {
         type: 'product_interaction',
         userId,
-        sessionId: this.sessionId,
-        action, // 'view', 'add_to_cart', 'remove_from_cart', 'purchase', 'wishlist_add', etc.
+        action, // 'view', 'add_to_cart', 'purchase', 'wishlist', etc.
         productId,
         productName,
-        timestamp: new Date().toISOString(),
-        ...additionalData
+        timestamp: Timestamp.now(),
+        metadata: additionalData
       });
     } catch (error) {
       console.error('Error tracking product interaction:', error);
@@ -94,33 +100,31 @@ class AnalyticsService {
   }
 
   // Track search queries
-  async trackSearch(userId, searchQuery, resultsCount, filters = {}) {
+  async trackSearch(userId, query, resultsCount, filters = {}) {
     try {
       await addDoc(collection(db, 'analytics'), {
         type: 'search',
         userId,
-        sessionId: this.sessionId,
-        searchQuery,
+        query,
         resultsCount,
         filters,
-        timestamp: new Date().toISOString()
+        timestamp: Timestamp.now()
       });
     } catch (error) {
       console.error('Error tracking search:', error);
     }
   }
 
-  // Track AI assistant interactions
+  // Track AI interactions
   async trackAIInteraction(userId, userMessage, aiResponse, responseTime) {
     try {
       await addDoc(collection(db, 'analytics'), {
         type: 'ai_interaction',
         userId,
-        sessionId: this.sessionId,
         userMessage,
-        aiResponse: aiResponse.substring(0, 500), // Limit response length
+        aiResponse,
         responseTime,
-        timestamp: new Date().toISOString()
+        timestamp: Timestamp.now()
       });
     } catch (error) {
       console.error('Error tracking AI interaction:', error);
@@ -133,269 +137,196 @@ class AnalyticsService {
       await addDoc(collection(db, 'analytics'), {
         type: 'error',
         userId,
-        sessionId: this.sessionId,
         errorType,
         errorMessage,
         stackTrace,
         context,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
+        timestamp: Timestamp.now(),
+        metadata: {
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        }
       });
     } catch (error) {
       console.error('Error tracking error:', error);
     }
   }
 
-  // Get user activity analytics
-  async getUserAnalytics(userId, days = 30) {
+  // Get analytics data for dashboard
+  async getAnalyticsData(timeRange = '30d') {
     try {
+      const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
 
-      const q = query(
-        collection(db, 'analytics'),
-        where('userId', '==', userId),
-        where('timestamp', '>=', startDate.toISOString()),
-        orderBy('timestamp', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      const activities = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      return this.processUserAnalytics(activities);
-    } catch (error) {
-      console.error('Error fetching user analytics:', error);
-      return null;
-    }
-  }
-
-  // Get system-wide analytics
-  async getSystemAnalytics(days = 30) {
-    try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const q = query(
-        collection(db, 'analytics'),
-        where('timestamp', '>=', startDate.toISOString()),
-        orderBy('timestamp', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      const activities = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      return this.processSystemAnalytics(activities);
-    } catch (error) {
-      console.error('Error fetching system analytics:', error);
-      return null;
-    }
-  }
-
-  // Process user analytics data
-  processUserAnalytics(activities) {
-    const stats = {
-      totalSessions: new Set(activities.map(a => a.sessionId)).size,
-      totalPageViews: activities.filter(a => a.type === 'page_view').length,
-      totalProductViews: activities.filter(a => a.type === 'product_interaction' && a.action === 'view').length,
-      totalSearches: activities.filter(a => a.type === 'search').length,
-      totalAIInteractions: activities.filter(a => a.type === 'ai_interaction').length,
-      averageSessionDuration: 0,
-      topPages: {},
-      topProducts: {},
-      searchQueries: [],
-      dailyActivity: {}
-    };
-
-    // Calculate daily activity
-    activities.forEach(activity => {
-      const date = new Date(activity.timestamp).toDateString();
-      if (!stats.dailyActivity[date]) {
-        stats.dailyActivity[date] = 0;
+      switch (timeRange) {
+        case '7d':
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(endDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(endDate.getDate() - 90);
+          break;
+        default:
+          startDate.setDate(endDate.getDate() - 30);
       }
-      stats.dailyActivity[date]++;
-    });
 
-    // Top pages
-    activities.filter(a => a.type === 'page_view').forEach(activity => {
-      const page = activity.pagePath || 'Unknown';
-      stats.topPages[page] = (stats.topPages[page] || 0) + 1;
-    });
+      const analyticsQuery = query(
+        collection(db, 'analytics'),
+        where('timestamp', '>=', Timestamp.fromDate(startDate)),
+        where('timestamp', '<=', Timestamp.fromDate(endDate)),
+        orderBy('timestamp', 'desc')
+      );
 
-    // Top products
-    activities.filter(a => a.type === 'product_interaction').forEach(activity => {
-      const product = activity.productName || 'Unknown';
-      stats.topProducts[product] = (stats.topProducts[product] || 0) + 1;
-    });
+      const snapshot = await getDocs(analyticsQuery);
+      const events = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp.toDate()
+      }));
 
-    // Search queries
-    stats.searchQueries = activities
-      .filter(a => a.type === 'search')
-      .map(a => a.searchQuery)
-      .slice(0, 10);
-
-    return stats;
+      return this.processAnalyticsData(events);
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      return this.getEmptyAnalyticsData();
+    }
   }
 
-  // Process system analytics data
-  processSystemAnalytics(activities) {
-    const stats = {
-      totalUsers: new Set(activities.map(a => a.userId).filter(Boolean)).size,
-      totalSessions: new Set(activities.map(a => a.sessionId)).size,
-      totalPageViews: activities.filter(a => a.type === 'page_view').length,
-      totalLogins: activities.filter(a => a.type === 'login').length,
-      totalProductInteractions: activities.filter(a => a.type === 'product_interaction').length,
-      totalSearches: activities.filter(a => a.type === 'search').length,
-      totalAIInteractions: activities.filter(a => a.type === 'ai_interaction').length,
-      totalErrors: activities.filter(a => a.type === 'error').length,
+  processAnalyticsData(events) {
+    const data = {
+      totalEvents: events.length,
+      userActivity: {},
+      productInteractions: {},
+      searchQueries: [],
+      aiInteractions: [],
+      errors: [],
       dailyStats: {},
       topPages: {},
-      topProducts: {},
-      topSearches: {},
-      errorTypes: {},
-      platformStats: {}
+      conversionFunnel: {
+        pageViews: 0,
+        productViews: 0,
+        cartAdditions: 0,
+        purchases: 0
+      }
     };
 
-    // Daily statistics
-    activities.forEach(activity => {
-      const date = new Date(activity.timestamp).toDateString();
-      if (!stats.dailyStats[date]) {
-        stats.dailyStats[date] = {
-          users: new Set(),
-          sessions: new Set(),
+    events.forEach(event => {
+      const date = event.timestamp.toISOString().split('T')[0];
+
+      // Initialize daily stats
+      if (!data.dailyStats[date]) {
+        data.dailyStats[date] = {
           pageViews: 0,
           logins: 0,
-          errors: 0
+          registrations: 0,
+          productInteractions: 0
         };
       }
 
-      if (activity.userId) stats.dailyStats[date].users.add(activity.userId);
-      stats.dailyStats[date].sessions.add(activity.sessionId);
-      
-      if (activity.type === 'page_view') stats.dailyStats[date].pageViews++;
-      if (activity.type === 'login') stats.dailyStats[date].logins++;
-      if (activity.type === 'error') stats.dailyStats[date].errors++;
-    });
+      // Process different event types
+      switch (event.type) {
+        case 'page_view':
+          data.dailyStats[date].pageViews++;
+          data.conversionFunnel.pageViews++;
+          data.topPages[event.path] = (data.topPages[event.path] || 0) + 1;
+          break;
 
-    // Convert sets to counts
-    Object.keys(stats.dailyStats).forEach(date => {
-      stats.dailyStats[date].users = stats.dailyStats[date].users.size;
-      stats.dailyStats[date].sessions = stats.dailyStats[date].sessions.size;
-    });
+        case 'login':
+          data.dailyStats[date].logins++;
+          break;
 
-    // Top pages
-    activities.filter(a => a.type === 'page_view').forEach(activity => {
-      const page = activity.pagePath || 'Unknown';
-      stats.topPages[page] = (stats.topPages[page] || 0) + 1;
-    });
+        case 'registration':
+          data.dailyStats[date].registrations++;
+          break;
 
-    // Top products
-    activities.filter(a => a.type === 'product_interaction').forEach(activity => {
-      const product = activity.productName || 'Unknown';
-      stats.topProducts[product] = (stats.topProducts[product] || 0) + 1;
-    });
+        case 'product_interaction':
+          data.dailyStats[date].productInteractions++;
+          if (event.action === 'view') data.conversionFunnel.productViews++;
+          if (event.action === 'add_to_cart') data.conversionFunnel.cartAdditions++;
+          if (event.action === 'purchase') data.conversionFunnel.purchases++;
+          break;
 
-    // Top searches
-    activities.filter(a => a.type === 'search').forEach(activity => {
-      const query = activity.searchQuery || 'Unknown';
-      stats.topSearches[query] = (stats.topSearches[query] || 0) + 1;
-    });
+        case 'search':
+          data.searchQueries.push(event);
+          break;
 
-    // Error types
-    activities.filter(a => a.type === 'error').forEach(activity => {
-      const errorType = activity.errorType || 'Unknown';
-      stats.errorTypes[errorType] = (stats.errorTypes[errorType] || 0) + 1;
-    });
+        case 'ai_interaction':
+          data.aiInteractions.push(event);
+          break;
 
-    // Platform statistics
-    activities.forEach(activity => {
-      if (activity.platform) {
-        stats.platformStats[activity.platform] = (stats.platformStats[activity.platform] || 0) + 1;
+        case 'error':
+          data.errors.push(event);
+          break;
+      }
+
+      // Track user activity
+      if (event.userId) {
+        if (!data.userActivity[event.userId]) {
+          data.userActivity[event.userId] = {
+            events: 0,
+            lastActivity: event.timestamp
+          };
+        }
+        data.userActivity[event.userId].events++;
+        if (event.timestamp > data.userActivity[event.userId].lastActivity) {
+          data.userActivity[event.userId].lastActivity = event.timestamp;
+        }
       }
     });
 
-    return stats;
+    return data;
   }
 
-  // Get platform information
-  getPlatform() {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('mobile')) return 'mobile';
-    if (userAgent.includes('tablet')) return 'tablet';
-    return 'desktop';
+  getEmptyAnalyticsData() {
+    return {
+      totalEvents: 0,
+      userActivity: {},
+      productInteractions: {},
+      searchQueries: [],
+      aiInteractions: [],
+      errors: [],
+      dailyStats: {},
+      topPages: {},
+      conversionFunnel: {
+        pageViews: 0,
+        productViews: 0,
+        cartAdditions: 0,
+        purchases: 0
+      }
+    };
   }
 
-  // Track user registration
-  async trackRegistration(userId, registrationMethod = 'email') {
+  // Get real-time metrics
+  async getRealTimeMetrics() {
     try {
-      await addDoc(collection(db, 'analytics'), {
-        type: 'registration',
-        userId,
-        sessionId: this.sessionId,
-        registrationMethod,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        platform: this.getPlatform()
-      });
-    } catch (error) {
-      console.error('Error tracking registration:', error);
-    }
-  }
+      const lastHour = new Date();
+      lastHour.setHours(lastHour.getHours() - 1);
 
-  // Get popular products
-  async getPopularProducts(days = 30, limit = 10) {
-    try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const q = query(
+      const recentQuery = query(
         collection(db, 'analytics'),
-        where('type', '==', 'product_interaction'),
-        where('timestamp', '>=', startDate.toISOString()),
+        where('timestamp', '>=', Timestamp.fromDate(lastHour)),
         orderBy('timestamp', 'desc')
       );
 
-      const snapshot = await getDocs(q);
-      const interactions = snapshot.docs.map(doc => doc.data());
+      const snapshot = await getDocs(recentQuery);
+      const recentEvents = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
 
-      const productCounts = {};
-      interactions.forEach(interaction => {
-        const productId = interaction.productId;
-        if (!productCounts[productId]) {
-          productCounts[productId] = {
-            productId,
-            productName: interaction.productName,
-            views: 0,
-            addToCarts: 0,
-            purchases: 0
-          };
-        }
-
-        switch (interaction.action) {
-          case 'view':
-            productCounts[productId].views++;
-            break;
-          case 'add_to_cart':
-            productCounts[productId].addToCarts++;
-            break;
-          case 'purchase':
-            productCounts[productId].purchases++;
-            break;
-        }
-      });
-
-      return Object.values(productCounts)
-        .sort((a, b) => (b.views + b.addToCarts * 2 + b.purchases * 3) - (a.views + a.addToCarts * 2 + a.purchases * 3))
-        .slice(0, limit);
+      return {
+        activeUsers: new Set(recentEvents.map(e => e.userId).filter(Boolean)).size,
+        recentEvents: recentEvents.length,
+        lastUpdated: new Date()
+      };
     } catch (error) {
-      console.error('Error fetching popular products:', error);
-      return [];
+      console.error('Error fetching real-time metrics:', error);
+      return {
+        activeUsers: 0,
+        recentEvents: 0,
+        lastUpdated: new Date()
+      };
     }
   }
 }

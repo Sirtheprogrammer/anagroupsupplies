@@ -21,7 +21,7 @@ import Products from './pages/Products';
 import Wishlist from './pages/Wishlist';
 import Profile from './pages/Profile';
 import Orders from './pages/Orders';
-import Admin from './pages/Admin';
+import AdminPanel from './pages/AdminPanel';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
@@ -75,7 +75,7 @@ function App() {
                   } />
                   <Route path="/admin" element={
                     <ProtectedRoute adminOnly>
-                      <Admin />
+                      <AdminPanel />
                     </ProtectedRoute>
                   } />
                   <Route path="/admin/products" element={
