@@ -217,23 +217,23 @@ export const AuthProvider = ({ children }) => {
       window.addEventListener('popstate', handleLocationChange);
       
       // Override history methods for SPA navigation tracking
-      const originalPushState = history.pushState;
-      const originalReplaceState = history.replaceState;
+      const originalPushState = window.history.pushState;
+      const originalReplaceState = window.history.replaceState;
 
-      history.pushState = function(...args) {
-        originalPushState.apply(history, args);
+      window.history.pushState = function(...args) {
+        originalPushState.apply(window.history, args);
         handleLocationChange();
       };
 
-      history.replaceState = function(...args) {
-        originalReplaceState.apply(history, args);
+      window.history.replaceState = function(...args) {
+        originalReplaceState.apply(window.history, args);
         handleLocationChange();
       };
 
       return () => {
         window.removeEventListener('popstate', handleLocationChange);
-        history.pushState = originalPushState;
-        history.replaceState = originalReplaceState;
+        window.history.pushState = originalPushState;
+        window.history.replaceState = originalReplaceState;
       };
     }
   }, [user, loading]);
