@@ -8,27 +8,71 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      // Assumes the user's UID exists as a document ID in the 'admins' collection
-      // and that the rule below allows authenticated users to read their own admin document.
       return isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+    
+    function isValidProduct() {
+      let incoming = request.resource.data;
+      return incoming.name is string && incoming.name.size() > 0 &&
+             incoming.price is number && incoming.price >= 0 &&
+             incoming.createdAt is timestamp &&
+             incoming.description is string;
+    }
+    
+    function isValidOrder() {
+      let incoming = request.resource.data;
+      return incoming.userId is string &&
+             incoming.status in ['pending', 'processing', 'completed', 'cancelled'] &&
+             incoming.total is number && incoming.total >= 0 &&
+             incoming.createdAt is timestamp;
+    }
+    
+    function isValidReview() {
+      let incoming = request.resource.data;
+      return incoming.userId is string &&
+             incoming.rating is number &&
+             incoming.rating >= 1 && 
+             incoming.rating <= 5 &&
+             incoming.text is string &&
+             incoming.createdAt is timestamp;
+    }
 
     // Products collection rules
     match /products/{productId} {
-      allow read: if true; // Anyone can read products
-      allow create, update, delete: if isAdmin(); // Only admins can modify products
+      allow read: if true;
+      allow create: if isAdmin() && isValidProduct();
+      allow update: if isAdmin() && isValidProduct() &&
+                   request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+      
+      // Product reviews subcollection
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isAuthenticated() && isValidReview() &&
+                     request.resource.data.userId == request.auth.uid;
+        allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+      }
     }
 
     // Users collection rules
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId && 
+                   request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']);
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                   request.resource.data.diff(resource.data).affectedKeys()
+                   .hasAny(['displayName', 'phone', 'address', 'photoURL', 'preferences', 'lastLogin', 'updatedAt']);
       allow delete: if isAdmin();
+      
+      // User's orders subcollection
+      match /orders/{orderId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false; // Orders should only be written to main orders collection
+      }
     }
 
     // Orders collection rules
@@ -36,49 +80,74 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         resource.data.userId == request.auth.uid || isAdmin()
       );
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
+      allow create: if isAuthenticated() && 
+                   request.resource.data.userId == request.auth.uid &&
+                   isValidOrder();
+      allow update: if isAdmin() || 
+                   (isOwner(resource.data.userId) && 
+                    request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(['status']) &&
+                    request.resource.data.status in ['cancelled']);
       allow delete: if isAdmin();
     }
 
     // Cart collection rules
     match /carts/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && 
+                          request.resource.data.keys().hasAll(['updatedAt']);
+      allow delete: if isOwner(userId);
       
-      // Allow access to items subcollection
       match /items/{itemId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && 
+                            request.resource.data.keys().hasAll(['productId', 'quantity']) &&
+                            request.resource.data.quantity > 0;
+        allow delete: if isOwner(userId);
       }
     }
 
     // Wishlist collection rules
     match /wishlists/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && 
+                          request.resource.data.keys().hasAll(['updatedAt']);
+      allow delete: if isOwner(userId);
       
-      // Allow access to items subcollection
       match /items/{itemId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && 
+                            request.resource.data.keys().hasAll(['productId', 'addedAt']);
+        allow delete: if isOwner(userId);
       }
     }
 
     // Admins collection rules
-    // Allow authenticated users to read their own admin document, but only admins can write.
     match /admins/{adminId} {
       allow read: if isAuthenticated() && request.auth.uid == adminId;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && request.resource.data.keys().hasAll(['role']);
+      allow delete: if isAdmin() && request.auth.uid != adminId; // Admin cannot delete themselves
     }
 
     // Categories collection rules
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && 
+                          request.resource.data.keys().hasAll(['name', 'description', 'createdAt']);
+      allow delete: if isAdmin();
     }
 
-    // Reviews collection rules
-    match /reviews/{reviewId} {
-      allow read: if true;
+    // Analytics collection rules
+    match /analytics/{docId} {
+      allow read: if isAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Settings collection rules
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 } 
