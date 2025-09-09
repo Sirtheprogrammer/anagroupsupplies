@@ -21,10 +21,14 @@ const Orders = () => {
       );
 
       const querySnapshot = await getDocs(q);
-      const ordersList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const ordersList = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.() || new Date(data.createdAt) || new Date(),
+        };
+      });
 
       setOrders(ordersList);
     } catch (error) {

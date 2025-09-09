@@ -3,6 +3,7 @@ import { db } from '../firebase/config';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import {
   ShoppingBagIcon,
   TagIcon,
@@ -112,13 +113,25 @@ const Home = () => {
 
   if (loadingProducts || loadingCategories) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative h-12 w-12 mx-auto">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-surface dark:from-background-dark dark:to-surface-dark">
+        <div className="text-center relative">
+          <div className="relative h-16 w-16 mx-auto">
             <div className="absolute animate-ping h-full w-full rounded-full bg-primary opacity-20"></div>
-            <div className="animate-spin rounded-full h-full w-full border-2 border-t-primary border-r-secondary border-b-accent border-l-transparent"></div>
+            <div className="absolute animate-spin h-full w-full rounded-full border-4 border-t-primary border-r-secondary border-b-accent border-l-transparent"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="w-8 h-8 text-primary animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            </div>
           </div>
-          <p className="mt-4 text-lg bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-medium">Loading...</p>
+          <div className="mt-6 relative">
+            <p className="text-lg font-medium animate-pulse">
+              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Loading amazing products...
+              </span>
+            </p>
+            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">Please wait a moment</div>
+          </div>
         </div>
       </div>
     );
@@ -143,77 +156,133 @@ const Home = () => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {/* Animated Hero Section */}
-      {showHero && (
-        <section className="w-full bg-gradient-to-r from-primary to-secondary text-white py-8 md:py-16 relative overflow-hidden flex items-center min-h-[35vh] md:min-h-[50vh] animate-fadeIn -mx-4">
-          <div className="absolute inset-0 bg-black/10">
-            <div className="absolute inset-0 bg-primary mix-blend-multiply opacity-10 animate-pulse"></div>
-            <div className="absolute inset-0 bg-grid-pattern opacity-20"></div>
-          </div>
-          <div className="w-full max-w-6xl mx-auto px-4 md:px-8 relative">
-            <div className="text-center max-w-4xl mx-auto">
-              <div className="mb-2 md:mb-4">
-                <span className="text-sm md:text-lg font-medium tracking-wide animate-bounce">Welcome to</span>
-              </div>
-              <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold mb-3 md:mb-6 drop-shadow-lg animate-pulse">
-                AnA Group Supplies
-              </h1>
-              <p className="text-sm md:text-base lg:text-lg mb-4 md:mb-6 text-white/95 mx-auto font-medium animate-fadeIn max-w-2xl">
-                Your One-Stop Shop for Quality Products
-              </p>
-              <Link
-                to="/products"
-                className="inline-block bg-white text-primary hover:bg-gray-100 px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-full transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/30"
-              >
-                Explore Our Products
-              </Link>
+      <div className="relative">
+        {/* Animated Hero Section */}
+        {showHero && (
+          <section className="relative min-h-[60vh] sm:min-h-[70vh] lg:min-h-[80vh] w-full overflow-hidden">
+            {/* Background with parallax effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent">
+              <div className="absolute inset-0 bg-grid-pattern opacity-30 dark:opacity-20 transform scale-150 rotate-12 animate-float"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
             </div>
-          </div>
-        </section>
-      )}
+
+            {/* Floating shapes */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-blob"></div>
+              <div className="absolute top-1/3 right-1/4 w-40 h-40 bg-white/10 rounded-full blur-2xl animate-blob animation-delay-2000"></div>
+              <div className="absolute bottom-1/4 left-1/3 w-36 h-36 bg-white/10 rounded-full blur-2xl animate-blob animation-delay-4000"></div>
+            </div>
+
+            {/* Content */}
+            <div className="relative h-full flex items-center justify-center">
+              <div className="text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pt-20 pb-12">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="space-y-6"
+                >
+                  <span className="inline-block text-white/90 text-sm sm:text-base tracking-wider uppercase animate-float">
+                    Welcome to
+                  </span>
+                  <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-white leading-tight">
+                    AnA Group Supplies
+                  </h1>
+                  <p className="text-white/90 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto leading-relaxed">
+                    Your Premier Destination for Quality Products at Unbeatable Prices
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+                    <Link
+                      to="/products"
+                      className="group relative inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-transparent overflow-hidden transition-all duration-300"
+                    >
+                      <span className="absolute inset-0 bg-white/10 rounded-lg backdrop-blur-sm group-hover:bg-white/20 transition-all duration-300"></span>
+                      <span className="relative flex items-center">
+                        Explore Products
+                        <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                        </svg>
+                      </span>
+                    </Link>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Scroll indicator */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-bounce">
+              <svg className="w-6 h-6 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </div>
+          </section>
+        )}
 
       {/* Categories Section */}
-      <section className="py-6 md:py-12">
+      <section className="py-8 sm:py-12 lg:py-16">
         <div className="w-full text-center">
-          <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-text dark:text-text-dark px-2">Shop by Category</h2>
-          <div className="flex space-x-2 md:space-x-3 overflow-x-auto pb-4 px-2 scrollbar-hide snap-x snap-mandatory">
-            <button
-              onClick={() => handleCategoryClick(null)}
-              className={`snap-center flex items-center px-3 md:px-4 py-2 rounded-full shadow-sm transition-all duration-300 flex-shrink-0 hover:scale-105 text-xs md:text-sm whitespace-nowrap
-                ${selectedCategory === null ? 'bg-primary text-white' : 'bg-surface dark:bg-surface-dark text-text dark:text-text-dark shadow'}
-              `}
-            >
-              <ShoppingBagIcon className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-              <span>All Products</span>
-            </button>
-
-            {categories.map((category) => {
-              const IconComponent = iconMap[category.name] || ShoppingBagIcon;
-              return (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="relative">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-8 text-text dark:text-text-dark inline-block">
+                Shop by Category
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+              </h2>
+            </div>
+            
+            <div className="relative">
+              <div className="flex space-x-3 sm:space-x-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-6 px-2 -mx-2 scroll-smooth">
                 <button
-                  key={category.id}
-                  onClick={() => handleCategoryClick(category.id)}
-                  className={`snap-center flex items-center px-3 md:px-4 py-2 rounded-full shadow-sm transition-all duration-300 flex-shrink-0 hover:scale-105 text-xs md:text-sm whitespace-nowrap
-                    ${selectedCategory === category.id
-                      ? 'bg-primary text-white shadow-md'
-                      : 'bg-surface dark:bg-surface-dark text-text dark:text-text-dark shadow'}
-                  `}
+                  onClick={() => handleCategoryClick(null)}
+                  className={`group snap-start flex flex-col items-center min-w-[100px] sm:min-w-[120px] p-3 rounded-xl backdrop-blur-sm transition-all duration-300 transform hover:-translate-y-1
+                    ${selectedCategory === null 
+                      ? 'bg-gradient-to-br from-primary to-secondary text-white shadow-lg' 
+                      : 'bg-surface/80 dark:bg-surface-dark/80 text-text dark:text-text-dark hover:bg-surface/90 dark:hover:bg-surface-dark/90 shadow-sm hover:shadow-md'
+                    }`}
                 >
-                  <IconComponent className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
-                  <span>{category.name}</span>
+                  <div className={`rounded-full p-3 mb-2 transition-colors duration-300
+                    ${selectedCategory === null 
+                      ? 'bg-white/20' 
+                      : 'bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20 dark:group-hover:bg-primary/30'
+                    }`}>
+                    <ShoppingBagIcon className="h-6 w-6" />
+                  </div>
+                  <span className="text-sm font-medium whitespace-nowrap">All Products</span>
                 </button>
-              );
-            })}
+
+                {categories.map((category) => {
+                  const IconComponent = iconMap[category.name] || ShoppingBagIcon;
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => handleCategoryClick(category.id)}
+                      className={`group snap-start flex flex-col items-center min-w-[100px] sm:min-w-[120px] p-3 rounded-xl transition-all duration-300 transform hover:-translate-y-1
+                        ${selectedCategory === category.id
+                          ? 'bg-gradient-to-br from-primary to-secondary text-white shadow-lg' 
+                          : 'bg-surface/80 dark:bg-surface-dark/80 text-text dark:text-text-dark hover:bg-surface/90 dark:hover:bg-surface-dark/90 shadow-sm hover:shadow-md'
+                        }`}
+                    >
+                      <div className={`rounded-full p-3 mb-2 transition-colors duration-300
+                        ${selectedCategory === category.id
+                          ? 'bg-white/20' 
+                          : 'bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20 dark:group-hover:bg-primary/30'
+                        }`}>
+                        <IconComponent className="h-6 w-6" />
+                      </div>
+                      <span className="text-sm font-medium whitespace-nowrap">{category.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Products Section */}
-      <section className="py-4 md:py-12 products-section">
-        <div className="w-full">
-          <h2 className="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-text dark:text-text-dark text-center px-2">
-            Explore by Category
+      <section className="py-8 sm:py-12 lg:py-16 products-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-8 sm:mb-12 text-text dark:text-text-dark text-center">
+            Featured Collections
           </h2>
 
           {/* For each category show a single horizontal row of products and a See All link */}
@@ -222,51 +291,90 @@ const Home = () => {
             if (!catProducts || catProducts.length === 0) return null;
 
             return (
-              <div key={category.id} className="mb-6 md:mb-8">
-                <div className="flex items-center justify-between mb-3 md:mb-4 px-2">
-                  <h3 className="text-base md:text-lg font-semibold text-text dark:text-text-dark">{category.name}</h3>
+              <div key={category.id} className="mb-12 sm:mb-16">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-xl sm:text-2xl font-bold text-text dark:text-text-dark group-hover:text-primary transition-colors duration-300">
+                      {category.name}
+                    </h3>
+                    <div className="h-1 w-8 bg-gradient-to-r from-primary to-secondary rounded-full"></div>
+                  </div>
                   <Link
                     to={`/products?category=${category.id}`}
-                    className="text-xs md:text-sm text-primary hover:underline flex-shrink-0"
+                    className="group flex items-center text-sm text-primary hover:text-primary-dark transition-colors duration-300"
                   >
-                    See all
+                    <span>View Collection</span>
+                    <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </Link>
                 </div>
 
-                <div className="overflow-x-auto -mx-2 px-2 scrollbar-hide">
-                  <div className="flex space-x-3 md:space-x-4 snap-x snap-mandatory" style={{ width: 'max-content' }}>
-                    {catProducts.slice(0, isMobile ? 3 : 5).map(product => (
-                      <div
-                        key={product.id}
-                        className="snap-start w-[140px] sm:w-[160px] md:w-[200px] lg:w-[220px] bg-surface dark:bg-surface-dark rounded-lg md:rounded-xl shadow hover:shadow-lg transition-all duration-300 overflow-hidden flex-shrink-0 hover:-translate-y-1 border border-gray-200 dark:border-gray-700"
-                      >
-                        <Link to={`/product/${product.id}`} className="block h-full">
-                          <div className="w-full bg-gray-100 dark:bg-gray-800 overflow-hidden aspect-square">
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="object-contain w-full h-full transition-transform duration-500 hover:scale-110 p-1 md:p-2"
-                              loading="lazy"
-                            />
-                          </div>
-                          <div className="p-2 md:p-3">
-                            <h4 className="text-xs md:text-sm font-medium text-text dark:text-text-dark line-clamp-2 mb-1 md:mb-2 min-h-[2rem] md:min-h-[2.5rem]">{product.name}</h4>
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="text-primary font-bold text-xs md:text-sm truncate">TZS {parseFloat(product.price).toLocaleString()}</span>
-                              <button
-                                onClick={(e) => { e.preventDefault(); /* add to cart */ }}
-                                className="inline-flex items-center justify-center p-1.5 md:p-2 bg-primary text-white rounded-md md:rounded-lg hover:bg-primary-dark transition-colors duration-200 shadow-sm hover:shadow-md flex-shrink-0"
-                                aria-label={`Add ${product.name} to cart`}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 md:h-4 md:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17" />
-                                </svg>
-                              </button>
+                <div className="relative">
+                  {/* Gradient fade edges for scroll indication */}
+                  <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent dark:from-background-dark pointer-events-none z-10"></div>
+                  <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent dark:from-background-dark pointer-events-none z-10"></div>
+
+                  <div className="overflow-x-auto -mx-4 px-4 pb-4 scrollbar-hide scroll-smooth">
+                    <div className="flex space-x-4 sm:space-x-6" style={{ width: 'max-content' }}>
+                      {catProducts.slice(0, isMobile ? 4 : 6).map(product => (
+                        <div
+                          key={product.id}
+                          className="group relative w-[160px] sm:w-[200px] lg:w-[240px] bg-surface dark:bg-surface-dark rounded-2xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden flex-shrink-0 backdrop-blur-sm"
+                        >
+                          <Link to={`/product/${product.id}`} className="block h-full">
+                            <div className="relative w-full bg-gray-100 dark:bg-gray-800 overflow-hidden aspect-square group-hover:shadow-inner">
+                              <img
+                                src={product.image}
+                                alt={product.name}
+                                className="object-contain w-full h-full p-4 transition-transform duration-700 group-hover:scale-110"
+                                loading="lazy"
+                              />
+                              {product.stock <= 0 && (
+                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                  <span className="text-white text-sm font-medium px-3 py-1 bg-red-500/80 rounded-full">
+                                    Out of Stock
+                                  </span>
+                                </div>
+                              )}
                             </div>
+                            <div className="p-4">
+                              <h4 className="text-sm sm:text-base font-medium text-text dark:text-text-dark line-clamp-2 mb-2 min-h-[2.5rem] group-hover:text-primary transition-colors duration-300">
+                                {product.name}
+                              </h4>
+                              <div className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                  <span className="text-sm text-gray-500 dark:text-gray-400">Price</span>
+                                  <span className="text-primary font-bold">
+                                    TZS {parseFloat(product.price).toLocaleString()}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={(e) => { e.preventDefault(); /* add to cart */ }}
+                                  disabled={product.stock <= 0}
+                                  className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 ${
+                                    product.stock > 0
+                                      ? 'bg-primary text-white hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/30'
+                                      : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
+                                  }`}
+                                  aria-label={`Add ${product.name} to cart`}
+                                >
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </Link>
+                          {/* Quick view overlay */}
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <button className="px-4 py-2 bg-white text-primary rounded-full transform -translate-y-4 group-hover:translate-y-0 transition-transform duration-500 hover:bg-gray-100">
+                              Quick View
+                            </button>
                           </div>
-                        </Link>
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
