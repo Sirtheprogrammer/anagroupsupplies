@@ -1,137 +1,77 @@
+import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import {
-  ShoppingBagIcon,
-  TagIcon,
-  GiftIcon,
-  SparklesIcon,
-} from '@heroicons/react/24/outline';
+import { Container, Row, Col, Card, Button, Nav, Form, InputGroup } from 'react-bootstrap';
+import { 
+  Search, 
+  House, 
+  Cart, 
+  Person, 
+  Heart,
+  ChevronRight
+} from 'react-bootstrap-icons';
 
-const iconMap = {
-  Jerseys: ShoppingBagIcon,
-  Trousers: TagIcon,
-  'T-Shirts': ShoppingBagIcon,
-  Sandals: GiftIcon,
-  Shoes: GiftIcon,
-  Others: SparklesIcon,
-};
+// Import Bootstrap CSS
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [showHero, setShowHero] = useState(true);
-  const heroTimeoutRef = useRef(null);
-
-  // Add window resize listener
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Hide hero section after 5 seconds
-  useEffect(() => {
-    heroTimeoutRef.current = setTimeout(() => {
-      setShowHero(false);
-    }, 5000);
-
-    return () => {
-      if (heroTimeoutRef.current) {
-        clearTimeout(heroTimeoutRef.current);
-      }
-    };
-  }, []);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoadingProducts(true);
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        let q = collection(db, 'products');
-
-        if (selectedCategory) {
-          q = query(q, where('category', '==', selectedCategory));
-        }
-
-        const querySnapshot = await getDocs(q);
-        const productsList = querySnapshot.docs.map(doc => ({
+        // Fetch categories
+        const categoriesSnapshot = await getDocs(collection(db, 'categories'));
+        const categoriesData = categoriesSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        setCategories(categoriesData);
 
-        // Sort products by creation date on the client side
-        productsList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        
-        setProducts(productsList);
+        // Fetch products
+        let productsQuery = collection(db, 'products');
+        if (selectedCategory) {
+          productsQuery = query(productsQuery, where('category', '==', selectedCategory));
+        }
+        const productsSnapshot = await getDocs(productsQuery);
+        const productsData = productsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
         setError('');
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setError(error.message);
-        toast.error('Failed to load products. Please try again later.');
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load data. Please try again later.');
+        toast.error('Failed to load data');
       } finally {
-        setLoadingProducts(false);
+        setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchData();
   }, [selectedCategory]);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      setLoadingCategories(true);
-      try {
-        const querySnapshot = await getDocs(collection(db, 'categories'));
-        const categoriesList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setCategories(categoriesList);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoadingCategories(false);
-      }
-    };
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    fetchCategories();
-  }, []);
-
-  const handleCategoryClick = (categoryId) => {
-    setSelectedCategory(categoryId);
-  };
-
-  if (loadingProducts || loadingCategories) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-surface dark:from-background-dark dark:to-surface-dark">
-        <div className="text-center relative">
-          <div className="relative h-16 w-16 mx-auto">
-            <div className="absolute animate-ping h-full w-full rounded-full bg-primary opacity-20"></div>
-            <div className="absolute animate-spin h-full w-full rounded-full border-4 border-t-primary border-r-secondary border-b-accent border-l-transparent"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <svg className="w-8 h-8 text-primary animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-            </div>
+      <div className="vh-100 d-flex align-items-center justify-content-center bg-light">
+        <div className="text-center">
+          <div className="spinner-border text-primary mb-3" role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-          <div className="mt-6 relative">
-            <p className="text-lg font-medium animate-pulse">
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Loading amazing products...
-              </span>
-            </p>
-            <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">Please wait a moment</div>
-          </div>
+          <p className="text-muted">Loading amazing products...</p>
         </div>
       </div>
     );
@@ -139,257 +79,190 @@ const Home = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center text-red-600">
-          <h2 className="text-2xl font-bold mb-2">Error Loading Data</h2>
-          <p>{error}</p>
-          <button
+      <div className="vh-100 d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <div className="text-danger mb-3">
+            <i className="bi bi-exclamation-circle-fill fs-1"></i>
+          </div>
+          <h5 className="text-danger">{error}</h5>
+          <Button 
+            variant="primary" 
             onClick={() => window.location.reload()}
-            className="mt-4 px-6 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105"
+            className="mt-3"
           >
             Try Again
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden">
-      <div className="relative">
-        {/* Animated Hero Section */}
-        {showHero && (
-          <section className="relative min-h-[60vh] sm:min-h-[70vh] lg:min-h-[80vh] w-full overflow-hidden">
-            {/* Background with parallax effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary via-secondary to-accent">
-              <div className="absolute inset-0 bg-grid-pattern opacity-30 dark:opacity-20 transform scale-150 rotate-12 animate-float"></div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
-            </div>
+    <div className="min-vh-100 d-flex flex-column">
+      {/* Fixed Header */}
+      <header className="fixed-top bg-white shadow-sm">
+        <Container fluid className="px-3 py-2">
+          <Row className="align-items-center">
+            <Col xs="auto">
+              <h1 className="h5 mb-0">AnA Group</h1>
+            </Col>
+            <Col>
+              <InputGroup>
+                <Form.Control
+                  type="search"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="border-end-0"
+                />
+                <InputGroup.Text className="bg-white border-start-0">
+                  <Search />
+                </InputGroup.Text>
+              </InputGroup>
+            </Col>
+          </Row>
+        </Container>
 
-            {/* Floating shapes */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-              <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-white/10 rounded-full blur-2xl animate-blob"></div>
-              <div className="absolute top-1/3 right-1/4 w-40 h-40 bg-white/10 rounded-full blur-2xl animate-blob animation-delay-2000"></div>
-              <div className="absolute bottom-1/4 left-1/3 w-36 h-36 bg-white/10 rounded-full blur-2xl animate-blob animation-delay-4000"></div>
-            </div>
-
-            {/* Content */}
-            <div className="relative h-full flex items-center justify-center">
-              <div className="text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto pt-20 pb-12">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
-                  className="space-y-6"
+        {/* Categories Scrollbar */}
+        <div className="border-top overflow-auto">
+          <Container fluid className="px-3">
+            <Nav className="flex-nowrap py-2 gap-2">
+              <Nav.Item>
+                <Button
+                  variant={selectedCategory === null ? "primary" : "light"}
+                  onClick={() => setSelectedCategory(null)}
+                  className="rounded-pill px-3 py-1"
                 >
-                  <span className="inline-block text-white/90 text-sm sm:text-base tracking-wider uppercase animate-float">
-                    Welcome to
-                  </span>
-                  <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-white leading-tight">
-                    AnA Group Supplies
-                  </h1>
-                  <p className="text-white/90 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto leading-relaxed">
-                    Your Premier Destination for Quality Products at Unbeatable Prices
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
-                    <Link
-                      to="/products"
-                      className="group relative inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-transparent overflow-hidden transition-all duration-300"
-                    >
-                      <span className="absolute inset-0 bg-white/10 rounded-lg backdrop-blur-sm group-hover:bg-white/20 transition-all duration-300"></span>
-                      <span className="relative flex items-center">
-                        Explore Products
-                        <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                      </span>
-                    </Link>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-
-            {/* Scroll indicator */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 animate-bounce">
-              <svg className="w-6 h-6 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </div>
-          </section>
-        )}
-
-      {/* Categories Section */}
-      <section className="py-8 sm:py-12 lg:py-16">
-        <div className="w-full text-center">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="relative">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-8 text-text dark:text-text-dark inline-block">
-                Shop by Category
-                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-              </h2>
-            </div>
-            
-            <div className="relative">
-              <div className="flex space-x-3 sm:space-x-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-6 px-2 -mx-2 scroll-smooth">
-                <button
-                  onClick={() => handleCategoryClick(null)}
-                  className={`group snap-start flex flex-col items-center min-w-[100px] sm:min-w-[120px] p-3 rounded-xl backdrop-blur-sm transition-all duration-300 transform hover:-translate-y-1
-                    ${selectedCategory === null 
-                      ? 'bg-gradient-to-br from-primary to-secondary text-white shadow-lg' 
-                      : 'bg-surface/80 dark:bg-surface-dark/80 text-text dark:text-text-dark hover:bg-surface/90 dark:hover:bg-surface-dark/90 shadow-sm hover:shadow-md'
-                    }`}
-                >
-                  <div className={`rounded-full p-3 mb-2 transition-colors duration-300
-                    ${selectedCategory === null 
-                      ? 'bg-white/20' 
-                      : 'bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20 dark:group-hover:bg-primary/30'
-                    }`}>
-                    <ShoppingBagIcon className="h-6 w-6" />
-                  </div>
-                  <span className="text-sm font-medium whitespace-nowrap">All Products</span>
-                </button>
-
-                {categories.map((category) => {
-                  const IconComponent = iconMap[category.name] || ShoppingBagIcon;
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategoryClick(category.id)}
-                      className={`group snap-start flex flex-col items-center min-w-[100px] sm:min-w-[120px] p-3 rounded-xl transition-all duration-300 transform hover:-translate-y-1
-                        ${selectedCategory === category.id
-                          ? 'bg-gradient-to-br from-primary to-secondary text-white shadow-lg' 
-                          : 'bg-surface/80 dark:bg-surface-dark/80 text-text dark:text-text-dark hover:bg-surface/90 dark:hover:bg-surface-dark/90 shadow-sm hover:shadow-md'
-                        }`}
-                    >
-                      <div className={`rounded-full p-3 mb-2 transition-colors duration-300
-                        ${selectedCategory === category.id
-                          ? 'bg-white/20' 
-                          : 'bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20 dark:group-hover:bg-primary/30'
-                        }`}>
-                        <IconComponent className="h-6 w-6" />
-                      </div>
-                      <span className="text-sm font-medium whitespace-nowrap">{category.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+                  All
+                </Button>
+              </Nav.Item>
+              {categories.map(category => (
+                <Nav.Item key={category.id}>
+                  <Button
+                    variant={selectedCategory === category.id ? "primary" : "light"}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className="rounded-pill px-3 py-1 text-nowrap"
+                  >
+                    {category.name}
+                  </Button>
+                </Nav.Item>
+              ))}
+            </Nav>
+          </Container>
         </div>
-      </section>
+      </header>
 
-      {/* Products Section */}
-      <section className="py-8 sm:py-12 lg:py-16 products-section">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-8 sm:mb-12 text-text dark:text-text-dark text-center">
-            Featured Collections
-          </h2>
-
-          {/* For each category show a single horizontal row of products and a See All link */}
-          {categories.map((category) => {
-            const catProducts = products.filter(p => p.category === category.id);
-            if (!catProducts || catProducts.length === 0) return null;
+      {/* Main Content */}
+      <main className="flex-grow-1 mt-5 pt-5">
+        <Container fluid className="px-3">
+          {categories.map(category => {
+            const categoryProducts = filteredProducts.filter(p => p.category === category.id);
+            if (categoryProducts.length === 0) return null;
 
             return (
-              <div key={category.id} className="mb-12 sm:mb-16">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="text-xl sm:text-2xl font-bold text-text dark:text-text-dark group-hover:text-primary transition-colors duration-300">
-                      {category.name}
-                    </h3>
-                    <div className="h-1 w-8 bg-gradient-to-r from-primary to-secondary rounded-full"></div>
-                  </div>
-                  <Link
+              <section key={category.id} className="mb-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h2 className="h5 mb-0">{category.name}</h2>
+                  <Link 
                     to={`/products?category=${category.id}`}
-                    className="group flex items-center text-sm text-primary hover:text-primary-dark transition-colors duration-300"
+                    className="text-primary text-decoration-none d-flex align-items-center"
                   >
-                    <span>View Collection</span>
-                    <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    View All
+                    <ChevronRight className="ms-1" />
                   </Link>
                 </div>
 
-                <div className="relative">
-                  {/* Gradient fade edges for scroll indication */}
-                  <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent dark:from-background-dark pointer-events-none z-10"></div>
-                  <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent dark:from-background-dark pointer-events-none z-10"></div>
-
-                  <div className="overflow-x-auto -mx-4 px-4 pb-4 scrollbar-hide scroll-smooth">
-                    <div className="flex space-x-4 sm:space-x-6" style={{ width: 'max-content' }}>
-                      {catProducts.slice(0, isMobile ? 4 : 6).map(product => (
-                        <div
-                          key={product.id}
-                          className="group relative w-[160px] sm:w-[200px] lg:w-[240px] bg-surface dark:bg-surface-dark rounded-2xl shadow-sm hover:shadow-xl transition-all duration-500 overflow-hidden flex-shrink-0 backdrop-blur-sm"
-                        >
-                          <Link to={`/product/${product.id}`} className="block h-full">
-                            <div className="relative w-full bg-gray-100 dark:bg-gray-800 overflow-hidden aspect-square group-hover:shadow-inner">
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="object-contain w-full h-full p-4 transition-transform duration-700 group-hover:scale-110"
-                                loading="lazy"
-                              />
-                              {product.stock <= 0 && (
-                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                  <span className="text-white text-sm font-medium px-3 py-1 bg-red-500/80 rounded-full">
-                                    Out of Stock
-                                  </span>
-                                </div>
-                              )}
+                <Row className="g-3">
+                  {categoryProducts.slice(0, 6).map(product => (
+                    <Col xs={6} md={4} lg={3} key={product.id}>
+                      <Card className="h-100 border-0 shadow-sm">
+                        <div className="position-relative">
+                          <Card.Img
+                            variant="top"
+                            src={product.image}
+                            alt={product.name}
+                            style={{
+                              height: '160px',
+                              objectFit: 'cover'
+                            }}
+                          />
+                          {product.stock <= 0 && (
+                            <div className="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-50">
+                              <span className="badge bg-danger">Out of Stock</span>
                             </div>
-                            <div className="p-4">
-                              <h4 className="text-sm sm:text-base font-medium text-text dark:text-text-dark line-clamp-2 mb-2 min-h-[2.5rem] group-hover:text-primary transition-colors duration-300">
-                                {product.name}
-                              </h4>
-                              <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                  <span className="text-sm text-gray-500 dark:text-gray-400">Price</span>
-                                  <span className="text-primary font-bold">
-                                    TZS {parseFloat(product.price).toLocaleString()}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={(e) => { e.preventDefault(); /* add to cart */ }}
-                                  disabled={product.stock <= 0}
-                                  className={`flex items-center justify-center p-2 rounded-full transition-all duration-300 ${
-                                    product.stock > 0
-                                      ? 'bg-primary text-white hover:bg-primary-dark hover:shadow-lg hover:shadow-primary/30'
-                                      : 'bg-gray-300 dark:bg-gray-600 cursor-not-allowed'
-                                  }`}
-                                  aria-label={`Add ${product.name} to cart`}
-                                >
-                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          </Link>
-                          {/* Quick view overlay */}
-                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <button className="px-4 py-2 bg-white text-primary rounded-full transform -translate-y-4 group-hover:translate-y-0 transition-transform duration-500 hover:bg-gray-100">
-                              Quick View
-                            </button>
-                          </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                        <Card.Body className="p-2">
+                          <Card.Title className="h6 mb-2">
+                            {product.name}
+                          </Card.Title>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <span className="fw-bold text-primary">
+                              TZS {parseFloat(product.price).toLocaleString()}
+                            </span>
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              disabled={product.stock <= 0}
+                              className="rounded-circle p-1"
+                            >
+                              <Cart size={16} />
+                            </Button>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </section>
             );
           })}
 
-          {/* If no products at all, show fallback */}
-          {products.length === 0 && (
-            <div className="text-center text-gray-600 dark:text-gray-400 py-6 md:py-8 px-2">
-              No products available yet.
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-5">
+              <p className="text-muted">No products found</p>
             </div>
           )}
-        </div>
-      </section>
-      </div>
+        </Container>
+      </main>
+
+      {/* Fixed Bottom Navigation */}
+      <Nav className="fixed-bottom bg-white border-top">
+        <Container fluid className="px-0">
+          <Row className="w-100 mx-0">
+            <Col className="p-0">
+              <Nav.Link as={Link} to="/" className="text-center py-2 text-dark">
+                <House className="mb-1" size={20} />
+                <div className="small">Home</div>
+              </Nav.Link>
+            </Col>
+            <Col className="p-0">
+              <Nav.Link as={Link} to="/categories" className="text-center py-2 text-dark">
+                <Search className="mb-1" size={20} />
+                <div className="small">Search</div>
+              </Nav.Link>
+            </Col>
+            <Col className="p-0">
+              <Nav.Link as={Link} to="/cart" className="text-center py-2 text-dark">
+                <Cart className="mb-1" size={20} />
+                <div className="small">Cart</div>
+              </Nav.Link>
+            </Col>
+            <Col className="p-0">
+              <Nav.Link as={Link} to="/wishlist" className="text-center py-2 text-dark">
+                <Heart className="mb-1" size={20} />
+                <div className="small">Wishlist</div>
+              </Nav.Link>
+            </Col>
+            <Col className="p-0">
+              <Nav.Link as={Link} to="/profile" className="text-center py-2 text-dark">
+                <Person className="mb-1" size={20} />
+                <div className="small">Profile</div>
+              </Nav.Link>
+            </Col>
+          </Row>
+        </Container>
+      </Nav>
     </div>
   );
 };
