@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 class AnalyticsService {
@@ -257,6 +257,11 @@ class AnalyticsService {
 
         case 'error':
           data.errors.push(event);
+          break;
+
+        default:
+          // Handle any unrecognized event types
+          console.warn('Unhandled event type:', event.type);
           break;
       }
 

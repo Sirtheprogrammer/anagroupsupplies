@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProducts, deleteProduct } from '../firebase/index';
 import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { toast } from 'react-toastify';
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);

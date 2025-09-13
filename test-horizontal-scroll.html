@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horizontal Scroll Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Copy of the horizontal scroll styles */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .product-card-horizontal {
+            flex: 0 0 auto;
+            width: 320px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .product-card-horizontal:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-slideUp {
+            animation: slideUp 0.6s ease-out forwards;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        
+        .animate-slideUp:nth-child(1) { animation-delay: 0.1s; }
+        .animate-slideUp:nth-child(2) { animation-delay: 0.2s; }
+        .animate-slideUp:nth-child(3) { animation-delay: 0.3s; }
+        .animate-slideUp:nth-child(4) { animation-delay: 0.4s; }
+    </style>
+</head>
+<body class="bg-gray-50 p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Horizontal Product Showcase Test</h1>
+        
+        <!-- Test Section -->
+        <section class="mb-20">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Featured Products</h2>
+                    <p class="text-gray-600">8 premium products available</p>
+                </div>
+                <button class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                    View All →
+                </button>
+            </div>
+
+            <!-- Horizontal Scrollable Container -->
+            <div class="relative group/section">
+                <!-- Left Arrow -->
+                <button 
+                    onclick="scrollContainer('left')"
+                    class="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/section:opacity-100 transition-all duration-300 hover:scale-110 border"
+                >
+                    ←
+                </button>
+
+                <!-- Right Arrow -->
+                <button 
+                    onclick="scrollContainer('right')"
+                    class="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/section:opacity-100 transition-all duration-300 hover:scale-110 border"
+                >
+                    →
+                </button>
+
+                <!-- Scrollable Products Container -->
+                <div
+                    id="productContainer"
+                    class="flex overflow-x-auto scrollbar-hide gap-6 pb-4 scroll-smooth"
+                    style="scrollbar-width: none; -ms-overflow-style: none;"
+                >
+                    <!-- Product Cards -->
+                    <div class="product-card-horizontal animate-slideUp bg-white rounded-2xl shadow-sm border overflow-hidden">
+                        <div class="relative">
+                            <div class="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-500"></div>
+                            <button class="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                ♥
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold mb-2">Premium Product 1</h3>
+                            <p class="text-sm text-gray-600 mb-4">High-quality product with excellent features and design.</p>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-2xl font-bold text-blue-600">TZS 45,000</span>
+                            </div>
+                            <button class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card-horizontal animate-slideUp bg-white rounded-2xl shadow-sm border overflow-hidden">
+                        <div class="relative">
+                            <div class="w-full h-48 bg-gradient-to-br from-green-400 to-blue-500"></div>
+                            <button class="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                ♥
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold mb-2">Premium Product 2</h3>
+                            <p class="text-sm text-gray-600 mb-4">Another excellent product with amazing quality and value.</p>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-2xl font-bold text-blue-600">TZS 32,500</span>
+                            </div>
+                            <button class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card-horizontal animate-slideUp bg-white rounded-2xl shadow-sm border overflow-hidden">
+                        <div class="relative">
+                            <div class="w-full h-48 bg-gradient-to-br from-purple-400 to-pink-500"></div>
+                            <button class="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                ♥
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold mb-2">Premium Product 3</h3>
+                            <p class="text-sm text-gray-600 mb-4">Top-tier product with premium materials and craftsmanship.</p>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-2xl font-bold text-blue-600">TZS 67,800</span>
+                            </div>
+                            <button class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="product-card-horizontal animate-slideUp bg-white rounded-2xl shadow-sm border overflow-hidden">
+                        <div class="relative">
+                            <div class="w-full h-48 bg-gradient-to-br from-yellow-400 to-orange-500"></div>
+                            <button class="absolute top-4 right-4 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                ♥
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold mb-2">Premium Product 4</h3>
+                            <p class="text-sm text-gray-600 mb-4">Exceptional product with innovative features and design.</p>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-2xl font-bold text-blue-600">TZS 54,200</span>
+                            </div>
+                            <button class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- View All Card -->
+                    <div class="product-card-horizontal animate-slideUp bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-2xl">
+                        <div class="flex flex-col items-center justify-center h-full min-h-[400px] text-center p-8">
+                            <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                                →
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 mb-2">View All Products</h3>
+                            <p class="text-gray-600 mb-4">Discover more amazing products in this category</p>
+                            <button class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                Browse Collection →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mobile Test Instructions -->
+        <div class="bg-blue-50 p-6 rounded-lg">
+            <h3 class="font-bold mb-2">Test Instructions:</h3>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+                <li><strong>Desktop:</strong> Hover over the section to see arrow buttons, click to scroll</li>
+                <li><strong>Mobile:</strong> Swipe left/right to scroll through products</li>
+                <li><strong>All devices:</strong> Products should have smooth hover effects and animations</li>
+                <li>Cards should show partial visibility of next/previous items</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function scrollContainer(direction) {
+            const container = document.getElementById('productContainer');
+            const scrollAmount = 320; // Width of one product card + gap
+            const currentScroll = container.scrollLeft;
+            const targetScroll = direction === 'left' 
+                ? currentScroll - scrollAmount 
+                : currentScroll + scrollAmount;
+
+            container.scrollTo({
+                left: targetScroll,
+                behavior: 'smooth'
+            });
+        }
+
+        // Touch handling for mobile
+        let startX = null;
+        let startScrollLeft = null;
+
+        document.getElementById('productContainer').addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startScrollLeft = e.target.scrollLeft;
+        });
+
+        document.getElementById('productContainer').addEventListener('touchmove', (e) => {
+            if (!startX) return;
+            
+            const touch = e.touches[0];
+            const diff = startX - touch.clientX;
+            e.target.scrollLeft = startScrollLeft + diff;
+        });
+
+        document.getElementById('productContainer').addEventListener('touchend', () => {
+            startX = null;
+            startScrollLeft = null;
+        });
+    </script>
+</body>
+</html>

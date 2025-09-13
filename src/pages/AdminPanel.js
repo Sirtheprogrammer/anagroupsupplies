@@ -45,7 +45,7 @@ const AdminPanel = () => {
     // Set up real-time metrics polling
     const interval = setInterval(fetchRealTimeMetrics, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, [timeRange]);
+  }, [timeRange, fetchAllData]);
 
   const fetchAllData = async () => {
     try {

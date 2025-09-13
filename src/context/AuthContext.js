@@ -143,57 +143,106 @@ export const AuthProvider = ({ children }) => {
 
   // Listen for auth state changes
   useEffect(() => {
+    let timeoutId;
+    
+    // Set a timeout to ensure loading doesn't hang indefinitely
+    const loadingTimeout = setTimeout(() => {
+      console.warn('Auth loading timeout - forcing completion');
+      setLoading(false);
+    }, 10000); // 10 second timeout
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          // Get user profile
-          const userData = await getOrCreateUserProfile(firebaseUser);
-          
-          // Check if user is admin
-          const isAdmin = await checkAdminStatus(firebaseUser.uid);
-          
-          // Enhanced user object
-          const enhancedUser = {
-            ...firebaseUser,
-            ...userData,
-            isAdmin
-          };
+      try {
+        clearTimeout(loadingTimeout);
+        
+        if (firebaseUser) {
+          try {
+            // Get user profile with timeout
+            const userDataPromise = getOrCreateUserProfile(firebaseUser);
+            const adminCheckPromise = checkAdminStatus(firebaseUser.uid);
+            
+            // Use Promise.race to timeout these operations
+            const timeoutPromise = new Promise((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error('User setup timeout')), 5000);
+            });
+            
+            const [userData, isAdmin] = await Promise.race([
+              Promise.all([userDataPromise, adminCheckPromise]),
+              timeoutPromise
+            ]);
+            
+            clearTimeout(timeoutId);
+            
+            // Enhanced user object
+            const enhancedUser = {
+              ...firebaseUser,
+              ...userData,
+              isAdmin
+            };
 
-          setUser(enhancedUser);
-          setUserProfile(userData);
+            setUser(enhancedUser);
+            setUserProfile(userData);
 
-          // Set user in analytics service
-          analyticsService.setUser(firebaseUser.uid);
-
-          // Track login only if not initial load
-          if (!loading) {
-            await analyticsService.trackLogin(
-              firebaseUser.uid,
-              firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'email'
-            );
+            // Set user in analytics service (non-blocking)
+            try {
+              analyticsService.setUser(firebaseUser.uid);
+              
+              // Track login only if not initial load (non-blocking)
+              if (!loading) {
+                analyticsService.trackLogin(
+                  firebaseUser.uid,
+                  firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'email'
+                ).catch(err => console.warn('Analytics tracking failed:', err));
+              }
+            } catch (analyticsError) {
+              console.warn('Analytics setup failed:', analyticsError);
+            }
+            
+          } catch (error) {
+            console.error('Error setting up user:', error);
+            clearTimeout(timeoutId);
+            
+            // Fallback to basic user object
+            setUser({
+              ...firebaseUser,
+              isAdmin: false,
+              displayName: firebaseUser.displayName || 'User',
+              email: firebaseUser.email
+            });
+            setUserProfile(null);
           }
-        } catch (error) {
-          console.error('Error setting up user:', error);
-          // Fallback to basic user object
-          setUser({
-            ...firebaseUser,
-            isAdmin: false
-          });
+        } else {
+          // User logged out
+          try {
+            if (user && !loading) {
+              analyticsService.trackLogout(user.uid).catch(err =>
+                console.warn('Logout tracking failed:', err)
+              );
+            }
+          } catch (analyticsError) {
+            console.warn('Logout analytics failed:', analyticsError);
+          }
+          
+          setUser(null);
+          setUserProfile(null);
+          analyticsService.setUser(null);
         }
-      } else {
-        // User logged out
-        if (user && !loading) {
-          await analyticsService.trackLogout(user.uid);
-        }
+      } catch (error) {
+        console.error('Auth state change error:', error);
+        // Ensure we don't get stuck in loading state
         setUser(null);
         setUserProfile(null);
-        analyticsService.setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
-  }, [auth, loading, user]);
+    return () => {
+      unsubscribe();
+      clearTimeout(loadingTimeout);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [auth]);
 
   // Track page views
   useEffect(() => {
@@ -319,7 +368,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }; 

@@ -13,7 +13,7 @@ const Footer = () => {
                 alt="M3 Outfit Logo"
                 className="h-10 w-10 object-contain"
               />
-              <h3 className="text-2xl font-bold text-primary dark:text-primary-light tracking-wider">A.N.A GROUP SUPPLIES</h3>
+              <h3 className="text-2xl font-bold text-primary dark:text-primary-light tracking-wider">AnA GROUP SUPPLIES</h3>
             </div>
             <p className="text-gray-600 dark:text-gray-400">
               We care about your Style

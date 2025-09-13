@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 import { 
@@ -12,8 +12,6 @@ import {
   ArrowDownTrayIcon,
   UserPlusIcon,
   CalendarIcon,
-  ShoppingCartIcon,
-  HeartIcon,
   CogIcon
 } from '@heroicons/react/24/outline';
 

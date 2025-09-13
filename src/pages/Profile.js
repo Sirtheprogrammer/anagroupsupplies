@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 import {
@@ -116,7 +116,7 @@ const Profile = () => {
   useEffect(() => {
     // Only fetch profile data on initial mount or when user changes
     fetchProfile();
-  }, [user?.uid]); // Only depend on user.uid instead of fetchProfile
+  }, [user?.uid, fetchProfile]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
