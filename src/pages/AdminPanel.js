@@ -36,6 +36,7 @@ const AdminPanel = () => {
   });
   const [analytics, setAnalytics] = useState(null);
   const [realTimeMetrics, setRealTimeMetrics] = useState(null);
+  const [statsError, setStatsError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
   const [recentActivities, setRecentActivities] = useState([]);
@@ -48,48 +49,88 @@ const AdminPanel = () => {
   // Stats aggregation retry helpers to handle quota/exhaustion gracefully
   const statsRetryRef = useRef({ count: 0, delay: 2000 });
   const statsRetryTimeoutRef = useRef(null);
+  // Cache stats for short time to avoid repeating aggregation calls
+  const STATS_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  const statsCacheRef = useRef({ ts: 0, data: null });
 
   const fetchStats = useCallback(async () => {
+    setStatsError(null);
     const MAX_RETRIES = 3;
+    // Serve from cache if not stale
     try {
-      // Use Firestore aggregation count to avoid downloading whole collections
+      const cached = statsCacheRef.current.data || JSON.parse(localStorage.getItem('admin_stats_cache') || 'null');
+      const cachedTs = statsCacheRef.current.ts || (cached && cached._ts) || 0;
+      if (cached && (Date.now() - cachedTs) < STATS_TTL_MS) {
+        setStats(prev => ({ ...prev, ...cached }));
+        return;
+      }
+    } catch (e) {
+      // ignore cache parse errors
+    }
+    try {
+      // First: quick totals (these are the minimal needed values)
       const usersCountSnap = await getCountFromServer(query(collection(db, 'users')));
       const productsCountSnap = await getCountFromServer(query(collection(db, 'products')));
       const categoriesCountSnap = await getCountFromServer(query(collection(db, 'categories')));
-
-      // recent counts (last 7 days)
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      let recentUsersCount = 0;
-      let recentProductsCount = 0;
+      // active users (isActive flag)
+      let activeUsersCount = 0;
       try {
-        const recentUsersSnap = await getCountFromServer(query(collection(db, 'users'), where('createdAt', '>=', oneWeekAgo)));
-        recentUsersCount = recentUsersSnap.data().count;
+        const activeSnap = await getCountFromServer(query(collection(db, 'users'), where('isActive', '==', true)));
+        activeUsersCount = activeSnap.data().count;
       } catch (err) {
-        console.warn('recentUsers count aggregation failed:', err);
-      }
-      try {
-        const recentProductsSnap = await getCountFromServer(query(collection(db, 'products'), where('createdAt', '>=', oneWeekAgo)));
-        recentProductsCount = recentProductsSnap.data().count;
-      } catch (err) {
-        console.warn('recentProducts count aggregation failed:', err);
+        console.warn('active users aggregation failed:', err);
       }
 
-      setStats(prev => ({
-        ...prev,
+      // set quick totals immediately
+      const quick = {
         totalUsers: usersCountSnap.data().count || 0,
         totalProducts: productsCountSnap.data().count || 0,
         totalCategories: categoriesCountSnap.data().count || 0,
-        recentUsers: recentUsersCount,
-        recentProducts: recentProductsCount
-      }));
+        activeUsers: activeUsersCount
+      };
+      setStats(prev => ({ ...prev, ...quick }));
 
+      // cache quick results (in-memory + localStorage)
+      try {
+        statsCacheRef.current = { ts: Date.now(), data: quick };
+        localStorage.setItem('admin_stats_cache', JSON.stringify({ ...quick, _ts: statsCacheRef.current.ts }));
+      } catch (e) { /* ignore storage errors */ }
+
+      // Fetch recent counts in background (non-blocking) — optional and less frequent
+      (async () => {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        let recentUsersCount = 0;
+        let recentProductsCount = 0;
+        try {
+          const recentUsersSnap = await getCountFromServer(query(collection(db, 'users'), where('createdAt', '>=', oneWeekAgo)));
+          recentUsersCount = recentUsersSnap.data().count;
+        } catch (err) {
+          console.warn('recentUsers count aggregation failed:', err);
+        }
+        try {
+          const recentProductsSnap = await getCountFromServer(query(collection(db, 'products'), where('createdAt', '>=', oneWeekAgo)));
+          recentProductsCount = recentProductsSnap.data().count;
+        } catch (err) {
+          console.warn('recentProducts count aggregation failed:', err);
+        }
+        // update only the recent fields
+        setStats(prev => ({ ...prev, recentUsers: recentUsersCount, recentProducts: recentProductsCount }));
+        try {
+          const cached = statsCacheRef.current.data || {};
+          const updated = { ...cached, recentUsers: recentUsersCount, recentProducts: recentProductsCount };
+          statsCacheRef.current = { ts: Date.now(), data: updated };
+          localStorage.setItem('admin_stats_cache', JSON.stringify({ ...updated, _ts: statsCacheRef.current.ts }));
+        } catch (e) {}
+      })();
+     
       // reset retry state if success
       statsRetryRef.current.count = 0;
       statsRetryRef.current.delay = 2000;
       if (statsRetryTimeoutRef.current) { clearTimeout(statsRetryTimeoutRef.current); statsRetryTimeoutRef.current = null; }
     } catch (error) {
       console.error('Error fetching stats (aggregation failed):', error);
+      setStatsError(error?.message || String(error));
       const isQuotaError = String(error?.message || '').toLowerCase().includes('quota') || error?.code === 'resource-exhausted';
 
       if (isQuotaError && statsRetryRef.current.count < MAX_RETRIES) {
@@ -108,16 +149,16 @@ const AdminPanel = () => {
       // Optionally set a minimal fallback
       setStats(prev => ({ ...prev }));
     }
-  }, []);
+  }, [STATS_TTL_MS]);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       const analyticsData = await analyticsService.getAnalyticsData(timeRange);
       setAnalytics(analyticsData);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     }
-  };
+  }, [timeRange]);
 
   const fetchRealTimeMetrics = useCallback(async () => {
     try {
@@ -173,7 +214,7 @@ const AdminPanel = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [fetchStats, fetchRealTimeMetrics, fetchRecentActivities]);
+  }, [fetchStats, fetchRealTimeMetrics, fetchRecentActivities, fetchAnalytics]);
 
   useEffect(() => {
     // initial load
@@ -363,6 +404,11 @@ const AdminPanel = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
+      {statsError && (
+        <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-red-700">
+          <strong>Stats error:</strong> {statsError} (check console)
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 md:mb-8 gap-4">
         <div>
