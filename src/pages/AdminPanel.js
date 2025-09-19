@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, limit, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -45,8 +45,12 @@ const AdminPanel = () => {
   const REFRESH_COOLDOWN = 5000; // ms
   const analyticsLoadedRef = useRef(false);
   const analyticsTimeoutRef = useRef(null);
+  // Stats aggregation retry helpers to handle quota/exhaustion gracefully
+  const statsRetryRef = useRef({ count: 0, delay: 2000 });
+  const statsRetryTimeoutRef = useRef(null);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const MAX_RETRIES = 3;
     try {
       // Use Firestore aggregation count to avoid downloading whole collections
       const usersCountSnap = await getCountFromServer(query(collection(db, 'users')));
@@ -62,60 +66,49 @@ const AdminPanel = () => {
         const recentUsersSnap = await getCountFromServer(query(collection(db, 'users'), where('createdAt', '>=', oneWeekAgo)));
         recentUsersCount = recentUsersSnap.data().count;
       } catch (err) {
-        console.warn('recentUsers count aggregation failed, falling back to lightweight scan', err);
+        console.warn('recentUsers count aggregation failed:', err);
       }
       try {
         const recentProductsSnap = await getCountFromServer(query(collection(db, 'products'), where('createdAt', '>=', oneWeekAgo)));
         recentProductsCount = recentProductsSnap.data().count;
       } catch (err) {
-        console.warn('recentProducts count aggregation failed, falling back to lightweight scan', err);
+        console.warn('recentProducts count aggregation failed:', err);
       }
 
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalUsers: usersCountSnap.data().count || 0,
         totalProducts: productsCountSnap.data().count || 0,
-        totalOrders: 0, // implement later with an aggregate
         totalCategories: categoriesCountSnap.data().count || 0,
         recentUsers: recentUsersCount,
-        recentProducts: recentProductsCount,
-        activeUsers: 0, // active user calculation requires a different metric; leave 0 for now
-        totalRevenue: 0, // calculating revenue client-side is expensive; implement server-side aggregation later
-        pendingOrders: 0,
-        completedOrders: 0
-      });
+        recentProducts: recentProductsCount
+      }));
+
+      // reset retry state if success
+      statsRetryRef.current.count = 0;
+      statsRetryRef.current.delay = 2000;
+      if (statsRetryTimeoutRef.current) { clearTimeout(statsRetryTimeoutRef.current); statsRetryTimeoutRef.current = null; }
     } catch (error) {
       console.error('Error fetching stats (aggregation failed):', error);
-      // Fallback to previous heavier approach only if aggregation unavailable
-      try {
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const productsSnapshot = await getDocs(collection(db, 'products'));
-        const categoriesSnapshot = await getDocs(collection(db, 'categories'));
-        const users = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const categories = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const recentUsers = users.filter(u => u.createdAt && new Date(u.createdAt) >= oneWeekAgo).length;
-        const recentProducts = products.filter(p => p.createdAt && new Date(p.createdAt) >= oneWeekAgo).length;
-        const activeUsers = users.filter(user => user.isActive !== false).length;
-        const totalRevenue = products.reduce((sum, product) => sum + (parseFloat(product.price) || 0), 0);
-        setStats({
-          totalUsers: users.length,
-          totalProducts: products.length,
-          totalOrders: 0,
-          totalCategories: categories.length,
-          recentUsers,
-          recentProducts,
-          activeUsers,
-          totalRevenue,
-          pendingOrders: 0,
-          completedOrders: 0
-        });
-      } catch (err) {
-        console.error('Fallback stats fetch also failed:', err);
+      const isQuotaError = String(error?.message || '').toLowerCase().includes('quota') || error?.code === 'resource-exhausted';
+
+      if (isQuotaError && statsRetryRef.current.count < MAX_RETRIES) {
+        // exponential backoff retry for quota errors
+        const delay = statsRetryRef.current.delay || 2000;
+        statsRetryRef.current.count += 1;
+        statsRetryRef.current.delay = Math.min(delay * 2, 60000);
+        console.warn(`Quota exceeded. Will retry stats aggregation in ${delay}ms (attempt ${statsRetryRef.current.count})`);
+        statsRetryTimeoutRef.current = setTimeout(() => fetchStats(), delay);
+        return;
       }
+
+      // Don't perform full collection scans as a fallback when quota is exceeded — that worsens the problem.
+      // Instead, preserve existing stats or show zeros and surface guidance to the user.
+      console.warn('Aggregation failed and retries exhausted or not allowed. Skipping heavy fallback to avoid further quota usage.');
+      // Optionally set a minimal fallback
+      setStats(prev => ({ ...prev }));
     }
-  };
+  }, []);
 
   const fetchAnalytics = async () => {
     try {
@@ -126,16 +119,16 @@ const AdminPanel = () => {
     }
   };
 
-  const fetchRealTimeMetrics = async () => {
+  const fetchRealTimeMetrics = useCallback(async () => {
     try {
       const metrics = await analyticsService.getRealTimeMetrics();
       setRealTimeMetrics(metrics);
     } catch (error) {
       console.error('Error fetching real-time metrics:', error);
     }
-  };
+  }, []);
 
-  const fetchRecentActivities = async () => {
+  const fetchRecentActivities = useCallback(async () => {
     try {
       const activitiesQuery = query(
         collection(db, 'analytics'),
@@ -152,10 +145,10 @@ const AdminPanel = () => {
     } catch (error) {
       console.error('Error fetching recent activities:', error);
     }
-  };
+  }, []);
 
   // Fetch all dashboard data (function declaration)
-  async function fetchAllData() {
+  const fetchAllData = useCallback(async () => {
     if (isFetchingRef.current) return; // prevent overlapping
     isFetchingRef.current = true;
     try {
@@ -180,7 +173,7 @@ const AdminPanel = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }
+  }, [fetchStats, fetchRealTimeMetrics, fetchRecentActivities]);
 
   useEffect(() => {
     // initial load
@@ -212,6 +205,7 @@ const AdminPanel = () => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (analyticsTimeoutRef.current) clearTimeout(analyticsTimeoutRef.current);
+      if (statsRetryTimeoutRef.current) clearTimeout(statsRetryTimeoutRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [fetchAllData, fetchRealTimeMetrics]);

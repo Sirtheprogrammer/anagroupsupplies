@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, setDoc } from 'firebase/firestore';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, setDoc, getCountFromServer, where, limit, startAfter } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 import { 
@@ -31,6 +31,9 @@ const AdminUsers = () => {
     admins: 0,
     newThisMonth: 0
   });
+
+  const PAGE_SIZE = 50; // page size for users
+  const lastVisibleRef = useRef(null);
 
   const filterAndSortUsers = useCallback(() => {
     let filtered = [...users];
@@ -90,69 +93,57 @@ const AdminUsers = () => {
     setFilteredUsers(filtered);
   }, [users, searchTerm, filterBy, sortBy, sortOrder]);
 
-  // convert fetchUsers to a plain function to avoid TDZ issues
-  async function fetchUsers() {
+  // server-side aggregation for stats (cheap counts)
+  async function fetchStats() {
+    try {
+      const now = new Date();
+      const thisMonthIso = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const totalSnap = await getCountFromServer(query(collection(db, 'users')));
+      const activeSnap = await getCountFromServer(query(collection(db, 'users'), where('isActive', '==', true)));
+      const adminSnap = await getCountFromServer(query(collection(db, 'users'), where('role', '==', 'admin')));
+      const newThisMonthSnap = await getCountFromServer(query(collection(db, 'users'), where('createdAt', '>=', thisMonthIso)));
+
+      setUserStats({
+        total: totalSnap.data().count,
+        active: activeSnap.data().count,
+        admins: adminSnap.data().count,
+        newThisMonth: newThisMonthSnap.data().count
+      });
+    } catch (err) {
+      console.warn('Error fetching stats (aggregation failed):', err);
+      // keep existing stats on failure
+    }
+  }
+
+  // paginated users fetch
+  async function fetchUsers(reset = true) {
     try {
       setLoading(true);
-
-      console.log('Fetching users from Firestore...');
-
-      // First try with ordering, fallback to simple query if it fails
-      let usersSnapshot;
-      try {
-        const usersQuery = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-        usersSnapshot = await getDocs(usersQuery);
-        console.log('Users fetched with ordering:', usersSnapshot.size);
-      } catch (orderError) {
-        console.warn('OrderBy query failed, falling back to simple query:', orderError);
-        usersSnapshot = await getDocs(collection(db, 'users'));
-        console.log('Users fetched without ordering:', usersSnapshot.size);
+      if (reset) {
+        lastVisibleRef.current = null;
       }
 
-      const usersList = usersSnapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log('User data:', doc.id, data);
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt || new Date().toISOString(),
-          lastLogin: data.lastLogin || null,
-          isActive: data.isActive !== false,
-          role: data.role || 'user'
-        };
-      });
+      const clauses = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)];
+      if (lastVisibleRef.current) clauses.splice(1, 0, startAfter(lastVisibleRef.current));
 
-      console.log('Processed users list:', usersList.length);
+      const usersQuery = query(collection(db, 'users'), ...clauses);
+      const usersSnapshot = await getDocs(usersQuery);
 
-      // Calculate stats
-      const now = new Date();
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const usersList = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const stats = {
-        total: usersList.length,
-        active: usersList.filter(u => u.isActive).length,
-        admins: usersList.filter(u => u.role === 'admin').length,
-        newThisMonth: usersList.filter(u => {
-          try {
-            return new Date(u.createdAt) >= thisMonth;
-          } catch (e) {
-            console.warn('Invalid date for user:', u.id, u.createdAt);
-            return false;
-          }
-        }).length
-      };
-
-      console.log('Calculated stats:', stats);
-
-      setUsers(usersList);
-      setUserStats(stats);
-
-      if (usersList.length === 0) {
-        console.warn('No users found in database');
-        toast.info('No users found in the system');
+      if (reset) {
+        setUsers(usersList);
       } else {
-        console.log(`Successfully loaded ${usersList.length} users`);
+        setUsers(prev => [...prev, ...usersList]);
       }
+
+      if (usersSnapshot.docs.length > 0) {
+        lastVisibleRef.current = usersSnapshot.docs[usersSnapshot.docs.length - 1];
+      }
+
+      // fetch lightweight stats on initial load
+      if (reset) await fetchStats();
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error(`Failed to fetch users: ${error.message}`);
@@ -161,9 +152,9 @@ const AdminUsers = () => {
     }
   }
 
-  // Run initial fetch once on mount
+  // Run initial load
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(true);
   }, []);
 
   // Re-run filtering when input/state values change
@@ -527,6 +518,21 @@ const AdminUsers = () => {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Load More Button */}
+      <div className="flex justify-center mt-4">
+        <button
+          onClick={() => fetchUsers(false)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary touch-manipulation"
+          disabled={loading}
+        >
+          {loading ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+          ) : (
+            'Load More'
+          )}
+        </button>
       </div>
 
       {/* User Details Modal */}
