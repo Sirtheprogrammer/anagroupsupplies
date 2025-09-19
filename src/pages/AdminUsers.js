@@ -90,15 +90,8 @@ const AdminUsers = () => {
     setFilteredUsers(filtered);
   }, [users, searchTerm, filterBy, sortBy, sortOrder]);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    filterAndSortUsers();
-  }, [filterAndSortUsers]);
-
-  const fetchUsers = async () => {
+  // convert fetchUsers to a plain function to avoid TDZ issues
+  async function fetchUsers() {
     try {
       setLoading(true);
 
@@ -166,7 +159,17 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  // Run initial fetch once on mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Re-run filtering when input/state values change
+  useEffect(() => {
+    filterAndSortUsers();
+  }, [users, searchTerm, filterBy, sortBy, sortOrder]);
 
   const handleUpdateUserRole = async (userId, newRole) => {
     try {
