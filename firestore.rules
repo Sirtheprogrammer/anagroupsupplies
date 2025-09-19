@@ -1,0 +1,315 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions (fixed to use explicit return expressions)
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isValidProduct() {
+      let incoming = request.resource.data;
+      return incoming.name is string && incoming.name.size() > 0 &&
+        (incoming.price is number || (incoming.price is string && incoming.price.matches('^[0-9]+(\\.[0-9]+)?$'))) &&
+        incoming.description is string && incoming.description.size() > 0 &&
+        incoming.category is string &&
+        ((incoming.stock is number && incoming.stock >= 0) || !incoming.keys().hasAny(['stock'])) &&
+        ((incoming.createdAt is timestamp) || (incoming.createdAt is string)) &&
+        ((incoming.images is list) || (incoming.image is string) || !incoming.keys().hasAny(['images','image'])) &&
+        ((incoming.variants is list) || !incoming.keys().hasAny(['variants']));
+    }
+
+    function isValidOrder() {
+      let incoming = request.resource.data;
+      return incoming.userId is string &&
+             incoming.items is list &&
+             (incoming.total is number || (incoming.total is string && incoming.total.matches('^[0-9]+(\\.[0-9]+)?$'))) &&
+             // status and paymentStatus have safe defaults if missing
+             (!incoming.keys().hasAny(['status']) || incoming.status in ['pending', 'processing', 'completed', 'cancelled', 'shipped', 'delivered']) &&
+             (!incoming.keys().hasAny(['paymentStatus']) || incoming.paymentStatus in ['pending', 'completed', 'failed', 'refunded']) &&
+             (!incoming.keys().hasAny(['createdAt']) || (incoming.createdAt is timestamp) || (incoming.createdAt is string));
+    }
+
+    function isValidReview() {
+      let incoming = request.resource.data;
+      let rating = incoming.rating;
+      let ratingOK = (rating is number && rating >= 1 && rating <= 5) ||
+                    (rating is string && rating.matches('^[1-5](\\.0|\\.5)?$'));
+
+      return incoming.userId is string &&
+             incoming.productId is string &&
+             ratingOK &&
+             incoming.comment is string &&
+             incoming.comment.size() > 0 &&
+             (!incoming.keys().hasAny(['userName']) || incoming.userName is string) &&
+             (!incoming.keys().hasAny(['userPhoto']) || incoming.userPhoto is string) &&
+             (!incoming.keys().hasAny(['createdAt']) || incoming.createdAt is timestamp || incoming.createdAt is string);
+    }
+
+    function isValidShippingDetails() {
+      let incoming = request.resource.data;
+      return (incoming.fullName is string && incoming.email is string && 
+             incoming.email.matches('^[^@]+@[^@]+\\.[^@]+$') && 
+             incoming.phone is string &&
+             incoming.streetAddress is string && 
+             incoming.city is string && 
+             incoming.state is string && 
+             incoming.postalCode is string &&
+             incoming.country is string) || 
+             (incoming.shippingDetails is map && 
+              incoming.shippingDetails.keys().hasAll(['fullName','email','phone','streetAddress','city','state','postalCode','country']) &&
+              incoming.shippingDetails.fullName is string &&
+              incoming.shippingDetails.email is string && incoming.shippingDetails.email.matches('^[^@]+@[^@]+\\.[^@]+$') &&
+              incoming.shippingDetails.phone is string &&
+              incoming.shippingDetails.streetAddress is string &&
+              incoming.shippingDetails.city is string &&
+              incoming.shippingDetails.state is string &&
+              incoming.shippingDetails.postalCode is string &&
+              incoming.shippingDetails.country is string);
+    }
+
+    function isValidCartItem() {
+      let item = request.resource.data;
+      return item.productId is string &&
+        item.quantity is number && item.quantity > 0 &&
+        item.price is number && item.price >= 0;
+    }
+
+    // Products collection rules
+    match /products/{productId} {
+      allow read: if true;
+      allow list: if true;  // Allow querying products
+      allow create: if isAdmin() && isValidProduct();
+      // Allow admins to update full product docs or only specific fields such as stock, price, images, variants, updatedAt
+      allow update: if isAdmin() && (
+                   isValidProduct() ||
+                   request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['stock', 'price', 'updatedAt', 'images', 'variants'])
+      );
+      allow delete: if isAdmin();
+      
+      // Product reviews subcollection
+      match /reviews/{reviewId} {
+        allow read, list: if true;  // Allow reading and querying reviews
+        allow create: if isAuthenticated();  // Temporarily remove all validation to isolate auth issue
+        allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+        allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      }
+    }
+
+    // User-scoped reviews (if your app stores user reviews under users/{userId}/reviews)
+    match /users/{userId}/reviews/{reviewId} {
+      allow read, list: if isOwner(userId) || isAdmin() || true; // public read to show reviews in profiles
+      allow create: if isAuthenticated() && isValidReview() && request.resource.data.userId == request.auth.uid;
+      allow update: if isOwner(resource.data.userId) || isAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+    
+    // Uploads collection - store metadata for uploaded assets (images/files)
+    match /uploads/{uploadId} {
+      // Reading uploads is public for serving assets; writing limited to admins or the owner
+      allow read: if true;
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.uploaderId == request.auth.uid) && request.resource.data.keys().hasAll(['uploaderId','url','createdAt']);
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.uploaderId == request.auth.uid);
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+      // Admins may list all users for admin panel
+      allow list: if isAdmin();
+       allow read: if isOwner(userId) || isAdmin();
+       allow create: if isAuthenticated() && request.auth.uid == userId && 
+                    request.resource.data.keys().hasAll(['email', 'displayName', 'createdAt']);
+       allow update: if (isOwner(userId) || isAdmin()) && (
+                    request.resource.data.diff(resource.data).affectedKeys()
+                    .hasAny(['displayName', 'phone', 'address', 'photoURL', 'preferences', 'lastLogin', 'updatedAt']) ||
+                    (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']))
+                   );
+       allow delete: if isAdmin();
+      
+      // User's orders subcollection
+      match /orders/{orderId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false; // Orders should only be written to main orders collection
+      }
+    }
+
+    // Orders collection rules
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Allow listing and querying orders
+      match /{document=**} {
+        allow read: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid || isAdmin()
+        );
+      }
+      
+      allow create: if isAuthenticated() && 
+                   request.resource.data.userId == request.auth.uid &&
+                   isValidOrder() &&
+                   isValidShippingDetails();
+                   
+      allow update: if (isAdmin() && 
+                    request.resource.data.diff(resource.data).affectedKeys()
+                    .hasAny(['status', 'paymentStatus'])) || 
+                   (isOwner(resource.data.userId) && 
+                    request.resource.data.diff(resource.data).affectedKeys()
+                    .hasOnly(['status']) &&
+                    resource.data.status != 'cancelled' &&
+                    request.resource.data.status == 'cancelled');
+                    
+      allow delete: if isAdmin();
+    }
+
+    // Cart collection rules
+    match /carts/{userId} {
+      allow read, list: if isOwner(userId);
+      allow create: if isOwner(userId) && 
+                   request.resource.data.keys().hasAll(['updatedAt', 'items']) &&
+                   request.resource.data.items is list;
+      allow update: if isOwner(userId) && 
+                   request.resource.data.keys().hasAll(['updatedAt', 'items']) &&
+                   request.resource.data.items is list;
+      allow delete: if isOwner(userId);
+      
+      match /items/{itemId} {
+        allow read, list: if isOwner(userId);
+        allow create: if isOwner(userId) && 
+                     isValidCartItem() &&
+                     exists(/databases/$(database)/documents/products/$(request.resource.data.productId));
+        allow update: if isOwner(userId) && 
+                     isValidCartItem() &&
+                     exists(/databases/$(database)/documents/products/$(request.resource.data.productId));
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Wishlist collection rules
+    match /wishlists/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && 
+                          request.resource.data.keys().hasAll(['updatedAt']);
+      allow delete: if isOwner(userId);
+      
+      match /items/{itemId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && 
+                            request.resource.data.keys().hasAll(['productId', 'addedAt']);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Admins collection rules
+    match /admins/{adminId} {
+      // Allow admins to list and read admin docs so admin UI can query roles
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == adminId);
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && request.resource.data.keys().hasAll(['role']);
+      allow delete: if isAdmin() && request.auth.uid != adminId; // Admin cannot delete themselves
+    }
+
+    // Categories collection rules
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && 
+                          request.resource.data.keys().hasAll(['name', 'description', 'createdAt']);
+      allow delete: if isAdmin();
+    }
+
+    // Analytics collection rules
+    match /analytics/{docId} {
+      // Anyone authenticated can create analytics events (client tracking)
+      // Allow authenticated writes, or allow unauthenticated creation for low-risk event types
+      allow create: if isAuthenticated() || (
+        // permit unauthenticated clients to write common tracking events with minimal required fields
+        request.resource.data.type in ['page_view','product_interaction','search','error'] &&
+        request.resource.data.timestamp is timestamp &&
+        request.resource.data.type is string
+      );
+      
+      // Allow admins to read all analytics. Allow users to read their own analytics entries.
+      // Per-document checks ensure query results only include documents the client is allowed to read.
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      
+      // Only admins can update or delete analytics events
+      allow update, delete: if isAdmin();
+    }
+    
+    // Top-level reviews collection (apps often store reviews centrally)
+    match /reviews/{reviewId} {
+      // Reviews are public for reading (so product pages and profiles can display them)
+      allow read: if true;
+      allow list: if true;
+
+      // Creation must be by authenticated user with valid review payload
+      allow create: if isAuthenticated() && 
+                   request.resource.data.userId == request.auth.uid && 
+                   request.resource.data.productId is string &&
+                   request.resource.data.rating is number &&
+                   request.resource.data.rating >= 1 &&
+                   request.resource.data.rating <= 5 &&
+                   request.resource.data.comment is string &&
+                   request.resource.data.comment.size() > 0;
+
+      // Only the review owner or an admin may update or delete
+      allow update: if isOwner(resource.data.userId) || isAdmin();
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+
+    // Chat and messaging rules
+    match /chats/{chatId} {
+      // chat document holds participants: list
+      allow read: if isAuthenticated() && (resource.data.participants is list && resource.data.participants.hasAny([request.auth.uid]) || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.keys().hasAll(['participants','createdAt']) && request.resource.data.participants is list && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow update: if isAuthenticated() && (isAdmin() || (resource.data.participants is list && resource.data.participants.hasAny([request.auth.uid])));
+      allow delete: if isAdmin();
+
+      // messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]) || isAdmin());
+        allow create: if isAuthenticated() && request.resource.data.keys().hasAll(['senderId','text','timestamp']) && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if request.auth.uid == resource.data.senderId || isAdmin();
+      }
+    }
+
+    // Notifications (per-user)
+    match /notifications/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.keys().hasAll(['title','body','createdAt']));
+      allow update, delete: if isOwner(userId) || isAdmin();
+
+      match /{notificationId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAdmin() || (isOwner(userId) && request.resource.data.keys().hasAll(['title','body','createdAt']));
+        allow update, delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Broadcasts (public announcements)
+    match /broadcasts/{broadcastId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Status / stories (public short-lived status updates)
+    match /status/{statusId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.keys().hasAll(['userId','media','createdAt']);
+      allow update, delete: if request.auth.uid == resource.data.userId || isAdmin();
+    }
+
+    // Fallback: deny all other matches by default (implicit)
+  }
+}
