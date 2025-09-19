@@ -32,13 +32,71 @@ const AdminUsers = () => {
     newThisMonth: 0
   });
 
+  const filterAndSortUsers = useCallback(() => {
+    let filtered = [...users];
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(user =>
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply category filter
+    switch (filterBy) {
+      case 'active':
+        filtered = filtered.filter(user => user.isActive);
+        break;
+      case 'inactive':
+        filtered = filtered.filter(user => !user.isActive);
+        break;
+      case 'admin':
+        filtered = filtered.filter(user => user.role === 'admin');
+        break;
+      case 'recent':
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filtered = filtered.filter(user => new Date(user.createdAt) >= oneWeekAgo);
+        break;
+      default:
+        break;
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+
+      if (sortBy === 'createdAt' || sortBy === 'lastLogin') {
+        aValue = new Date(aValue || 0);
+        bValue = new Date(bValue || 0);
+      }
+
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue?.toLowerCase() || '';
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    setFilteredUsers(filtered);
+  }, [users, searchTerm, filterBy, sortBy, sortOrder]);
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
   useEffect(() => {
     filterAndSortUsers();
-  }, [users, searchTerm, filterBy, sortBy, sortOrder, filterAndSortUsers]);
+  }, [filterAndSortUsers]);
 
   const fetchUsers = async () => {
     try {
@@ -109,64 +167,6 @@ const AdminUsers = () => {
       setLoading(false);
     }
   };
-
-  const filterAndSortUsers = useCallback(() => {
-    let filtered = [...users];
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Apply category filter
-    switch (filterBy) {
-      case 'active':
-        filtered = filtered.filter(user => user.isActive);
-        break;
-      case 'inactive':
-        filtered = filtered.filter(user => !user.isActive);
-        break;
-      case 'admin':
-        filtered = filtered.filter(user => user.role === 'admin');
-        break;
-      case 'recent':
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        filtered = filtered.filter(user => new Date(user.createdAt) >= oneWeekAgo);
-        break;
-      default:
-        break;
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'createdAt' || sortBy === 'lastLogin') {
-        aValue = new Date(aValue || 0);
-        bValue = new Date(bValue || 0);
-      }
-
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase();
-        bValue = bValue?.toLowerCase() || '';
-      }
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    setFilteredUsers(filtered);
-  }, [users, searchTerm, filterBy, sortBy, sortOrder]);
 
   const handleUpdateUserRole = async (userId, newRole) => {
     try {
