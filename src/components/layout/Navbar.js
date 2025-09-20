@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { collection, getDocs, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import Profile from '../Profile';
+import SearchBar from '../SearchBar';
 import {
   ShoppingCartIcon,
   Bars3Icon,
@@ -95,15 +96,7 @@ const Navbar = ({ onMenuClick }) => {
 
             {/* Center Section: Search Bar (Desktop) */}
             <div className="hidden md:block flex-1 max-w-2xl mx-8">
-              <div className="relative group">
-                <MagnifyingGlassIcon className="h-5 w-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-text-tertiary dark:text-text-dark-tertiary group-focus-within:text-primary transition-colors duration-200" />
-                <input
-                  type="text"
-                  placeholder="Search premium products..."
-                  className="w-full pl-12 pr-4 py-3 text-base bg-background-secondary/50 dark:bg-background-dark-secondary/50 border border-border/30 dark:border-border-dark/30 rounded-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary dark:focus:border-primary focus:bg-surface dark:focus:bg-surface-dark focus:shadow-lg placeholder-text-tertiary dark:placeholder-text-dark-tertiary"
-                />
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 -z-10"></div>
-              </div>
+              <SearchBar className="w-full" />
             </div>
 
             {/* Right Section: Actions & User Menu */}
@@ -243,14 +236,8 @@ const Navbar = ({ onMenuClick }) => {
         {/* Mobile Search Bar */}
         {showMobileSearch && (
           <div className="md:hidden px-4 pb-4 border-t border-border/20 dark:border-border-dark/20 animate-slideDown">
-            <div className="relative group mt-4">
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-text-tertiary dark:text-text-dark-tertiary group-focus-within:text-primary transition-colors duration-200" />
-              <input
-                type="text"
-                placeholder="Search premium products..."
-                className="w-full pl-12 pr-4 py-3 bg-background-secondary/50 dark:bg-background-dark-secondary/50 border border-border/30 dark:border-border-dark/30 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all duration-300"
-                autoFocus
-              />
+            <div className="mt-4">
+              <SearchBar autoFocus={true} onClose={() => setShowMobileSearch(false)} />
             </div>
           </div>
         )}

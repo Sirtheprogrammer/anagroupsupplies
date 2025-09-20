@@ -57,10 +57,12 @@ const Home = () => {
 
   // Filter products by search query and selected category (memoized)
   const filteredProducts = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = String(searchQuery ?? '').trim().toLowerCase();
     return products.filter(product => {
-      const matchesSearch = q === '' ? true : (product.name || '').toLowerCase().includes(q);
-      const matchesCategory = selectedCategory ? product.category === selectedCategory : true;
+      const name = product && product.name != null ? String(product.name) : '';
+      const matchesSearch = q === '' ? true : name.toLowerCase().includes(q);
+      const categoryVal = product && product.category != null ? String(product.category) : '';
+      const matchesCategory = selectedCategory ? categoryVal === selectedCategory : true;
       return matchesSearch && matchesCategory;
     });
   }, [products, searchQuery, selectedCategory]);
