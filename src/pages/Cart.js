@@ -82,7 +82,7 @@ const Cart = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6 pb-40">
       <h1 className="text-2xl md:text-3xl font-bold mb-6 text-text dark:text-text-dark">Shopping Cart</h1>
       
       {cartItems.length === 0 ? (
@@ -97,55 +97,57 @@ const Cart = () => {
         </div>
       ) : (
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Cart Items */}
+          {/* Cart Items - compact cards for mobile */}
           <div className="flex-1">
             <div className="bg-surface dark:bg-surface-dark rounded-xl shadow overflow-hidden">
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="p-4 md:p-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div key={item.id} className="p-3 md:p-4">
+                    <div className="flex items-center gap-3">
                       {/* Product Image */}
-                      <Link to={`/product/${item.id}`} className="w-full sm:w-24 h-24 flex-shrink-0">
+                      <Link to={`/product/${item.id}`} className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
                         <img
                           src={item.image}
                           alt={item.name}
-                          className="w-full h-full object-cover rounded-lg"
+                          className="w-full h-full object-cover"
                         />
                       </Link>
 
-                      {/* Product Details */}
+                      {/* Details */}
                       <div className="flex-1 min-w-0">
                         <Link to={`/product/${item.id}`} className="block">
-                          <h2 className="text-lg font-semibold text-text dark:text-text-dark truncate">
-                            {item.name}
-                          </h2>
+                          <h2 className="text-sm font-semibold text-text dark:text-text-dark truncate">{item.name}</h2>
                         </Link>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">{formatPrice(item.price)}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="text-sm text-gray-600 dark:text-gray-400">{formatPrice(item.price)}</div>
+                          <div className="text-sm font-medium text-gray-700 dark:text-gray-200">Subtotal: {formatPrice(item.price * item.quantity)}</div>
+                        </div>
                       </div>
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center space-x-3">
+                      {/* Quantity Controls - compact */}
+                      <div className="flex items-center space-x-2 ml-2">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="p-1 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          aria-label={`Decrease quantity for ${item.name}`}
                         >
-                          <MinusIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                          <MinusIcon className="h-4 w-4 text-gray-700 dark:text-gray-200" />
                         </button>
-                        <span className="text-text dark:text-text-dark font-medium w-8 text-center">
-                          {item.quantity}
-                        </span>
+                        <span className="text-sm w-8 text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                          className="p-1 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          aria-label={`Increase quantity for ${item.name}`}
                         >
-                          <PlusIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                          <PlusIcon className="h-4 w-4 text-gray-700 dark:text-gray-200" />
                         </button>
                       </div>
 
-                      {/* Remove Button */}
+                      {/* Remove */}
                       <button
                         onClick={() => removeFromCart(item.id)}
-                        className="p-2 text-red-600 hover:text-red-800 dark:hover:text-red-500"
+                        className="p-2 text-red-600 hover:text-red-800 dark:hover:text-red-500 ml-2"
+                        aria-label={`Remove ${item.name} from cart`}
                       >
                         <TrashIcon className="h-5 w-5" />
                       </button>
@@ -156,8 +158,8 @@ const Cart = () => {
             </div>
           </div>
 
-          {/* Order Summary */}
-          <div className="lg:w-96">
+          {/* Order Summary - desktop */}
+          <div className="hidden lg:block lg:w-96">
             <div className="bg-surface dark:bg-surface-dark rounded-xl shadow p-6 sticky top-4">
               <h2 className="text-xl font-semibold mb-4 text-text dark:text-text-dark">Order Summary</h2>
               <div className="space-y-4">
@@ -187,6 +189,36 @@ const Cart = () => {
                 >
                   Continue Shopping
                 </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Bottom Bar - responsive full-width CTAs with safe-area padding */}
+          <div
+            className="fixed lg:hidden bottom-0 left-0 right-0 bg-white dark:bg-surface-dark border-t dark:border-gray-700 p-3 z-50"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}
+          >
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="w-full sm:w-auto flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Subtotal</div>
+                  <div className="text-lg font-semibold">{formatPrice(calculateTotal())}</div>
+                </div>
+              </div>
+
+              <div className="w-full sm:w-auto flex gap-2">
+                <Link
+                  to="/products"
+                  className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-primary text-primary rounded-md bg-white dark:bg-surface-dark"
+                >
+                  Continue
+                </Link>
+                <button
+                  onClick={() => navigate('/checkout')}
+                  className="flex-1 inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded-md shadow"
+                >
+                  Checkout
+                </button>
               </div>
             </div>
           </div>
