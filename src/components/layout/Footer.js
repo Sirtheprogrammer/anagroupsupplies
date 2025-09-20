@@ -56,11 +56,7 @@ const Footer = () => {
                   SHIPPING INFO
                 </Link>
               </li>
-              <li>
-                <Link to="/returns" className="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-light">
-                  RETURNS
-                </Link>
-              </li>
+              
             </ul>
           </div>
 

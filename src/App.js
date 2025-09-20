@@ -26,6 +26,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import SearchResults from './pages/SearchResults';
+import Contact from './pages/Contact';
+import Shipping from './pages/Shipping';
 
 const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const { loading } = useAuth();
@@ -55,6 +57,8 @@ const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/categories" element={<Categories />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/shipping" element={<Shipping />} />
             <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
             <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
