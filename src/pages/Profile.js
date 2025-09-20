@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, Timestamp, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 import {
@@ -44,74 +44,122 @@ const Profile = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
 
+  // Cache TTL for profile and recent lists to reduce repeated reads
+  const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
   const fetchProfile = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        // Only set the profile data if it hasn't been set before
-        setProfile(prevProfile => {
-          if (!prevProfile.displayName && !prevProfile.email) {
-            return {
-              displayName: userData.displayName || '',
-              email: userData.email || '',
-              phone: userData.phone || '',
-              address: userData.address || '',
-              preferences: userData.preferences || {
-                theme: 'light',
-                notifications: true,
-                newsletter: false
-              }
-            };
-          }
-          return prevProfile;
-        });
-      }
+    setLoading(true);
+    const cacheKey = `profile_cache_${user.uid}`;
 
-      // Fetch recent orders
+    // Try to serve from local cache to make the page feel instant
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && (Date.now() - parsed.ts) < CACHE_TTL_MS) {
+          if (parsed.profile) setProfile(parsed.profile);
+          if (Array.isArray(parsed.recentOrders)) setRecentOrders(parsed.recentOrders);
+          if (Array.isArray(parsed.recentActivity)) setRecentActivity(parsed.recentActivity);
+          setLoading(false);
+          // Refresh in background to update stale data without blocking UI
+          (async () => {
+            try {
+              await fetchProfileNetwork();
+            } catch (e) {
+              /* background refresh failed - ignore */
+            }
+          })();
+          return;
+        }
+      }
+    } catch (err) {
+      // ignore JSON/localStorage errors
+      console.warn('profile cache read failed', err);
+    }
+
+    // Network fetch implementation (separated so background call can reuse it)
+    async function fetchProfileNetwork() {
+      // Build queries that only fetch latest 5 items and avoid scanning entire collection
+      const userDocPromise = getDoc(doc(db, 'users', user.uid));
+      // Avoid orderBy on a different field to prevent needing composite indexes.
+      // We'll fetch a limited set and sort client-side by timestamp.
       const ordersQuery = query(
         collection(db, 'orders'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        limit(10) // fetch a few and trim/sort client-side
       );
-      const ordersSnapshot = await getDocs(ordersQuery);
-      setRecentOrders(
-        ordersSnapshot.docs
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: convertTimestamp(doc.data().createdAt)
-          }))
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .slice(0, 5)
-      );
-
-      // Fetch recent activity
       const activityQuery = query(
         collection(db, 'analytics'),
-        where('userId', '==', user.uid)
+        where('userId', '==', user.uid),
+        limit(10)
       );
-      const activitySnapshot = await getDocs(activityQuery);
-      const sortedActivity = activitySnapshot.docs
-        .map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          timestamp: convertTimestamp(doc.data().timestamp)
-        }))
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 5);
-      setRecentActivity(sortedActivity);
+
+      // Run requests in parallel and handle each result
+      const [userDocRes, ordersSnap, activitySnap] = await Promise.all([
+        userDocPromise,
+        getDocs(ordersQuery),
+        getDocs(activityQuery)
+      ]);
+
+      let fetchedProfile = null;
+      if (userDocRes && userDocRes.exists()) {
+        const ud = userDocRes.data();
+        fetchedProfile = {
+          displayName: ud.displayName || '',
+          email: ud.email || '',
+          phone: ud.phone || '',
+          address: ud.address || '',
+          preferences: ud.preferences || { theme: 'light', notifications: true, newsletter: false }
+        };
+      }
+
+      const fetchedOrders = (ordersSnap?.docs || []).map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: convertTimestamp(d.data().createdAt)
+      }));
+
+      const fetchedActivity = (activitySnap?.docs || []).map(d => ({
+        id: d.id,
+        ...d.data(),
+        timestamp: convertTimestamp(d.data().timestamp)
+      }));
+
+      // Sort client-side (descending) and limit to 5 so we don't rely on Firestore composite indexes
+      fetchedOrders.sort((a, b) => (b.createdAt?.getTime ? b.createdAt.getTime() : 0) - (a.createdAt?.getTime ? a.createdAt.getTime() : 0));
+      fetchedActivity.sort((a, b) => (b.timestamp?.getTime ? b.timestamp.getTime() : 0) - (a.timestamp?.getTime ? a.timestamp.getTime() : 0));
+
+      const limitedOrders = fetchedOrders.slice(0, 5);
+      const limitedActivity = fetchedActivity.slice(0, 5);
+
+      // Update state with merged results (preserve existing fields if missing)
+      if (fetchedProfile) setProfile(prev => ({ ...prev, ...fetchedProfile }));
+      setRecentOrders(limitedOrders);
+      setRecentActivity(limitedActivity);
+
+      // Cache the fetched results
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), profile: fetchedProfile, recentOrders: limitedOrders, recentActivity: limitedActivity }));
+      } catch (err) {
+        // ignore storage errors
+        console.warn('profile cache write failed', err);
+      }
+    }
+
+    try {
+      await fetchProfileNetwork();
     } catch (error) {
       console.error('Error fetching profile data:', error);
       toast.error('Failed to fetch profile data');
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, CACHE_TTL_MS]);
 
   useEffect(() => {
     // Only fetch profile data on initial mount or when user changes

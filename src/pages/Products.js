@@ -223,18 +223,14 @@ const Products = () => {
                     </div>
                   </div>
                 </Link>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Add to cart logic here
-                  }}
-                  className="w-full mt-3 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span>Add to Cart</span>
-                </button>
+                <Link to={`/product/${product.id}`} className="w-full block mt-3">
+                  <div className="w-full bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M12 12h.01M9 12h.01" />
+                    </svg>
+                    <span>View a product</span>
+                  </div>
+                </Link>
               </div>
             ))}
           </div>
