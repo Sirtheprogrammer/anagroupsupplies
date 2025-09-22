@@ -285,7 +285,7 @@ export const AuthProvider = ({ children }) => {
         window.history.replaceState = originalReplaceState;
       };
     }
-  }, [user, loading, analyticsService]);
+  }, [user, loading]);
 
   // Update user profile
   const updateUserProfile = async (updates) => {

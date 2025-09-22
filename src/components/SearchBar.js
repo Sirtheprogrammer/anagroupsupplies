@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSearchSuggestions, searchProducts } from '../services/searchService';
 import { debounce } from 'lodash';
@@ -32,26 +32,31 @@ const SearchBar = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced function to fetch suggestions
-  const debouncedFetchSuggestions = useCallback(
-    debounce(async (searchText) => {
-      if (searchText.length < 2) {
-        setSuggestions([]);
-        return;
-      }
+  // Fetch suggestions (stable via useCallback)
+  const fetchSuggestions = useCallback(async (searchText) => {
+    if (searchText.length < 2) {
+      setSuggestions([]);
+      return;
+    }
 
-      setIsLoading(true);
-      try {
-        const results = await getSearchSuggestions(searchText);
-        setSuggestions(results);
-      } catch (error) {
-        console.error('Error fetching suggestions:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 300),
-    []
-  );
+    setIsLoading(true);
+    try {
+      const results = await getSearchSuggestions(searchText);
+      setSuggestions(results);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setSuggestions, setIsLoading]);
+
+  // Debounced function to fetch suggestions (memoized)
+  const debouncedFetchSuggestions = useMemo(() => debounce(fetchSuggestions, 300), [fetchSuggestions]);
+
+  // Cancel pending debounced calls on unmount
+  useEffect(() => {
+    return () => debouncedFetchSuggestions.cancel && debouncedFetchSuggestions.cancel();
+  }, [debouncedFetchSuggestions]);
 
   // Handle input changes
   const handleInputChange = (e) => {
