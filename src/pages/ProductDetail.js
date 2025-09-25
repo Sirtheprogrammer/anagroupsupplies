@@ -13,6 +13,8 @@ const ProductDetail = () => {
   const { user } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [variants, setVariants] = useState([]);
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [editedProduct, setEditedProduct] = useState(null);
@@ -44,6 +46,29 @@ const ProductDetail = () => {
         const productData = { id: docSnap.id, ...docSnap.data() };
         setProduct(productData);
         setEditedProduct(productData);
+
+        // If this product belongs to a group, fetch sibling variants
+        if (productData.groupId) {
+          try {
+            const q = collection(db, 'products');
+            const snapshot = await getDocs(q);
+            const siblingVariants = snapshot.docs
+              .map(d => ({ id: d.id, ...d.data() }))
+              .filter(p => p.groupId === productData.groupId)
+              .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+
+            setVariants(siblingVariants);
+
+            // Set selected index to the current product within variants
+            const idx = siblingVariants.findIndex(v => v.id === productData.id);
+            if (idx >= 0) setSelectedVariantIndex(idx);
+          } catch (err) {
+            console.error('Error fetching sibling variants:', err);
+          }
+        } else {
+          setVariants([productData]);
+          setSelectedVariantIndex(0);
+        }
       } else {
         toast.error('Product not found');
         navigate('/products');
@@ -69,14 +94,17 @@ const ProductDetail = () => {
     }
 
     try {
+      const selected = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
       const cartRef = doc(db, 'carts', user.uid);
-      const cartItemRef = doc(cartRef, 'items', id);
+      // use variant id as the item id to allow multiple variants
+      const cartItemRef = doc(db, `carts/${user.uid}/items`, selected.id);
       
       await setDoc(cartItemRef, {
-        productId: id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
+        productId: selected.id,
+        groupId: selected.groupId || null,
+        name: selected.name,
+        price: selected.price,
+        image: selected.image,
         quantity: quantity,
         addedAt: new Date().toISOString()
       }, { merge: true });
@@ -96,14 +124,15 @@ const ProductDetail = () => {
     }
 
     try {
-      const wishlistRef = doc(db, 'wishlists', user.uid);
-      const wishlistItemRef = doc(wishlistRef, 'items', id);
+      const selected = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+      const wishlistItemRef = doc(db, `wishlists/${user.uid}/items`, selected.id);
       
       await setDoc(wishlistItemRef, {
-        productId: id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
+        productId: selected.id,
+        groupId: selected.groupId || null,
+        name: selected.name,
+        price: selected.price,
+        image: selected.image,
         addedAt: new Date().toISOString()
       }, { merge: true });
 
@@ -267,11 +296,47 @@ const ProductDetail = () => {
               )}
             </div>
           ) : (
-            <img
-              src={product.image}
-              alt={product.name}
-              className="w-full h-96 object-cover"
-            />
+            <div>
+              <img
+                src={(variants && variants.length > 0 ? variants[selectedVariantIndex].image : product.image)}
+                alt={product.name}
+                className="w-full h-96 object-cover"
+              />
+
+              {/* Thumbnails & navigation */}
+              {variants && variants.length > 1 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <button
+                    onClick={() => setSelectedVariantIndex(Math.max(0, selectedVariantIndex - 1))}
+                    className="p-2 rounded-md hover:bg-gray-100"
+                    aria-label="Previous variant"
+                  >
+                    ‹
+                  </button>
+
+                  <div className="flex gap-2 overflow-x-auto flex-1 px-4">
+                    {variants.map((v, idx) => (
+                      <button
+                        key={v.id}
+                        onClick={() => setSelectedVariantIndex(idx)}
+                        className={`w-20 h-20 rounded-md overflow-hidden border ${idx === selectedVariantIndex ? 'border-primary ring-2 ring-primary' : 'border-gray-200'} focus:outline-none`}
+                        aria-label={`Select variant ${idx + 1}`}
+                      >
+                        <img src={v.image} alt={v.name} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedVariantIndex(Math.min(variants.length - 1, selectedVariantIndex + 1))}
+                    className="p-2 rounded-md hover:bg-gray-100"
+                    aria-label="Next variant"
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -380,9 +445,9 @@ const ProductDetail = () => {
                 )}
               </div>
               <p className="text-2xl font-semibold text-primary mb-4">
-                TZS {parseFloat(product.price).toLocaleString()}
+                TZS {parseFloat((variants && variants.length > 0 ? variants[selectedVariantIndex].price : product.price)).toLocaleString()}
               </p>
-              <p className="text-gray-600 mb-6">{product.description}</p>
+              <p className="text-gray-600 mb-6">{(variants && variants.length > 0 ? variants[selectedVariantIndex].description || product.description : product.description)}</p>
 
               {/* Quantity Selector */}
               <div className="mb-6">
