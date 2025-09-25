@@ -24,6 +24,7 @@ import Orders from './pages/Orders';
 import AdminRoutes from './pages/AdminRoutes';
 import ProtectedRoute from './components/ProtectedRoute';
 import ProductDetail from './pages/ProductDetail';
+import GroupDetail from './pages/GroupDetail';
 import Checkout from './pages/Checkout';
 import SearchResults from './pages/SearchResults';
 import Contact from './pages/Contact';
@@ -55,6 +56,7 @@ const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
             <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/group/:groupId" element={<GroupDetail />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/contact" element={<Contact />} />

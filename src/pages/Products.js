@@ -70,12 +70,43 @@ const Products = () => {
           ...data
         };
       }).filter(product => product.name && product.price); // Only include products with required fields
-      
+
       // Sort products by creation date
       productsList.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      
-      console.log(`Found ${productsList.length} products`);
-      setProducts(productsList);
+
+      // Collapse grouped products into a single representative per groupId
+      const seenGroups = new Set();
+      const grouped = [];
+      for (const p of productsList) {
+        if (p.groupId) {
+          if (seenGroups.has(p.groupId)) continue;
+
+          const variants = productsList.filter(x => x.groupId === p.groupId);
+          const rep = variants[0];
+          const prices = variants.map(v => parseFloat(v.price || 0)).filter(n => !Number.isNaN(n));
+          const minPrice = prices.length > 0 ? Math.min(...prices) : parseFloat(rep.price || 0);
+
+          grouped.push({
+            id: rep.id,
+            groupId: p.groupId,
+            name: rep.name,
+            image: rep.image,
+            category: rep.category,
+            description: rep.description,
+            price: minPrice,
+            groupMinPrice: minPrice,
+            variantCount: variants.length,
+            createdAt: rep.createdAt
+          });
+
+          seenGroups.add(p.groupId);
+        } else {
+          grouped.push(p);
+        }
+      }
+
+      console.log(`Found ${grouped.length} products (grouped view)`);
+      setProducts(grouped);
       setCurrentPage(1); // Reset to first page when category changes
     } catch (error) {
       console.error('Error fetching products:', error);
