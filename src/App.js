@@ -8,7 +8,7 @@ import { ThemeProvider } from './context/ThemeContext';
 // Layout Components
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
-import Footer from './components/layout/Footer';
+import BottomNavigation from './components/layout/BottomNavigation';
 import Categories from './pages/Categories';
 import AIAssistant from './components/AIAssistant';
 
@@ -71,8 +71,8 @@ const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
             <Route path="/register" element={<Register />} />
           </Routes>
         </main>
-        
-        <Footer />
+
+        <BottomNavigation />
         <AIAssistant />
         
         <ToastContainer

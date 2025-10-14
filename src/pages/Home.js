@@ -4,11 +4,7 @@ import { db } from '../firebase/config';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
-  Search,
-  House,
-  Cart,
-  Person,
-  Heart
+  Search
 } from 'react-bootstrap-icons';
 
 const Home = () => {
@@ -451,31 +447,6 @@ return (
         )}
       </main>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-surface-dark/95 backdrop-blur-md border-t border-border/20 dark:border-border-dark/20 md:hidden z-40 shadow-lg">
-        <div className="grid grid-cols-5 h-16">
-          <Link to="/" className="flex flex-col items-center justify-center text-primary">
-            <House className="h-5 w-5 mb-1" />
-            <span className="text-xs font-medium">Home</span>
-          </Link>
-          <Link to="/products" className="flex flex-col items-center justify-center text-text-tertiary dark:text-text-dark-tertiary hover:text-primary transition-colors duration-200">
-            <Search className="h-5 w-5 mb-1" />
-            <span className="text-xs font-medium">Products</span>
-          </Link>
-          <Link to="/cart" className="flex flex-col items-center justify-center text-text-tertiary dark:text-text-dark-tertiary hover:text-primary transition-colors duration-200">
-            <Cart className="h-5 w-5 mb-1" />
-            <span className="text-xs font-medium">Cart</span>
-          </Link>
-          <Link to="/wishlist" className="flex flex-col items-center justify-center text-text-tertiary dark:text-text-dark-tertiary hover:text-primary transition-colors duration-200">
-            <Heart className="h-5 w-5 mb-1" />
-            <span className="text-xs font-medium">Wishlist</span>
-          </Link>
-          <Link to="/profile" className="flex flex-col items-center justify-center text-text-tertiary dark:text-text-dark-tertiary hover:text-primary transition-colors duration-200">
-            <Person className="h-5 w-5 mb-1" />
-            <span className="text-xs font-medium">Profile</span>
-          </Link>
-        </div>
-      </nav>
     </div>
   );
 };
