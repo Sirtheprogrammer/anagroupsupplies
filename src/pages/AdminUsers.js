@@ -155,12 +155,12 @@ const AdminUsers = () => {
   // Run initial load
   useEffect(() => {
     fetchUsers(true);
-  }, []);
+  }, [fetchUsers]);
 
   // Re-run filtering when input/state values change
   useEffect(() => {
     filterAndSortUsers();
-  }, [users, searchTerm, filterBy, sortBy, sortOrder]);
+  }, [filterAndSortUsers, users, searchTerm, filterBy, sortBy, sortOrder]);
 
   const handleUpdateUserRole = async (userId, newRole) => {
     try {

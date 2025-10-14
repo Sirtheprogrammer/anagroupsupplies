@@ -17,19 +17,28 @@ const EditProduct = () => {
     image: null
   });
   const [currentImageUrl, setCurrentImageUrl] = useState('');
+  const [originalGroupId, setOriginalGroupId] = useState(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         const product = await getProductById(id);
+        if (!product) {
+          toast.error('Product not found');
+          navigate('/admin/products');
+          return;
+        }
+
         setFormData({
-          name: product.name,
-          description: product.description,
-          price: product.price.toString(),
-          category: product.category,
+          name: product.name || '',
+          description: product.description || '',
+          price: (product.price !== undefined && product.price !== null) ? product.price.toString() : '',
+          category: product.category || '',
           image: null
         });
-        setCurrentImageUrl(product.image);
+        setCurrentImageUrl(product.image || '');
+        // remember if this product belongs to a group so we don't remove that association
+        if (product.groupId) setOriginalGroupId(product.groupId);
       } catch (error) {
         console.error('Error fetching product:', error);
         toast.error('Failed to fetch product details');
@@ -68,6 +77,11 @@ const EditProduct = () => {
         image: imageUrl,
         updatedAt: new Date().toISOString()
       };
+
+      // Preserve groupId on update for grouped variants
+      if (originalGroupId) {
+        productData.groupId = originalGroupId;
+      }
 
       await updateProduct(id, productData);
       toast.success('Product updated successfully!');

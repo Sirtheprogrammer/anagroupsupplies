@@ -66,6 +66,47 @@ export const addProduct = async (productData) => {
   }
 };
 
+// Create a product group and add variant products tied to that group
+export const addProductGroup = async (groupData, variants = []) => {
+  try {
+    console.log('Creating product group...', groupData);
+    const groupRef = await addDoc(collection(db, 'productGroups'), groupData);
+    const groupId = groupRef.id;
+
+    // Add each variant as a product with a reference to the group
+    const addedVariantIds = [];
+    for (const variant of variants) {
+      const variantData = {
+        ...groupData,
+        ...variant,
+        groupId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const variantRef = await addDoc(collection(db, 'products'), variantData);
+      addedVariantIds.push(variantRef.id);
+    }
+
+    // Persist variantIds into the group document so group metadata is immediately available
+    try {
+      await updateDoc(groupRef, {
+        variantIds: addedVariantIds,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.warn('Failed to persist variantIds on group doc:', err);
+      // Not fatal: variants were created; return their IDs so caller can handle
+    }
+
+    console.log('Product group created with ID:', groupId, 'variants:', addedVariantIds);
+    return { groupId, variantIds: addedVariantIds };
+  } catch (error) {
+    console.error('Error creating product group:', error);
+    throw error;
+  }
+};
+
 export const getProducts = async () => {
   try {
     console.log('Fetching products...');
@@ -89,8 +130,9 @@ export const getProductById = async (id) => {
       console.log('Product fetched successfully:', product);
       return product;
     } else {
-      console.error('Product not found');
-      throw new Error('Product not found');
+      console.warn(`Product not found for ID: ${id}`);
+      // Return null to let callers handle a missing product gracefully
+      return null;
     }
   } catch (error) {
     console.error('Error fetching product by ID:', error);

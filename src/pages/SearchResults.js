@@ -4,7 +4,6 @@ import { searchProducts } from '../services/searchService';
 import {
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 const SearchResults = () => {

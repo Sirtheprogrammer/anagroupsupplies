@@ -7,6 +7,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Product groups (shared metadata for grouped product variants)
+    match /productGroups/{groupId} {
+      // Public read access so product pages can fetch group-level metadata
+      allow read: if true;
+      allow list: if true;
+
+      // Only admins may create/update/delete groups
+      allow create: if isAdmin() && (
+        request.resource.data.keys().hasAll(['name','createdAt']) &&
+        request.resource.data.name is string && request.resource.data.name.size() > 0 &&
+        ((request.resource.data.variantIds is list) || !request.resource.data.keys().hasAny(['variantIds']) )
+      );
+
+      allow update: if isAdmin() && (
+        // allow updating name, description, variantIds and updatedAt
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name','description','variantIds','updatedAt'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
     function isAdmin() {
       return request.auth != null &&
              exists(/databases/$(database)/documents/admins/$(request.auth.uid));

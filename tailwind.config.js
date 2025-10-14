@@ -7,20 +7,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // primary: deep gold palette tuned for better contrast and accessibility
         primary: {
-          50: '#fffdf2',
-          100: '#fff9e6',
-          200: '#fff1bf',
-          300: '#ffe799',
-          400: '#ffde66',
-          500: '#ffd700',
-          600: '#e6bd00',
-          700: '#b58f00',
-          800: '#8a6b00',
-          900: '#5f4700',
-          DEFAULT: '#ffd700',
-          light: '#ffe066',
-          dark: '#e6bd00',
+          50: '#fff9f0',
+          100: '#fff1e0',
+          200: '#ffe3bf',
+          300: '#ffd39a',
+          400: '#ffc06a',
+          500: '#d4a017',
+          600: '#b08512',
+          700: '#8b640e',
+          800: '#66480a',
+          900: '#493307',
+          DEFAULT: '#d4a017',
+          light: '#ffd56a',
+          dark: '#b08512',
         },
         secondary: {
           50: '#f8fafc',
@@ -103,16 +104,17 @@ module.exports = {
           dark: '#1e293b',
           'dark-elevated': '#334155',
         },
+        // Adjust text tokens for better contrast with gold primary
         text: {
-          primary: '#0f172a',
-          secondary: '#475569',
-          tertiary: '#64748b',
+          primary: '#081226', // increased contrast (darker blue-black)
+          secondary: '#26323f',
+          tertiary: '#3b4b59',
           inverse: '#ffffff',
-          'dark-primary': '#f1f5f9',
-          'dark-secondary': '#cbd5e1',
-          'dark-tertiary': '#94a3b8',
-          DEFAULT: '#0f172a',
-          dark: '#f1f5f9',
+          'dark-primary': '#f8fafc',
+          'dark-secondary': '#e2e8f0',
+          'dark-tertiary': '#cbd5e1',
+          DEFAULT: '#081226',
+          dark: '#f8fafc',
         },
         border: {
           DEFAULT: '#e2e8f0',

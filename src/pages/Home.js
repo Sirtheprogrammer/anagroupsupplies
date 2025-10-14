@@ -34,14 +34,13 @@ const Home = () => {
         }));
         setCategories(categoriesData);
 
-        // Always fetch ALL products (don't filter by category in the query)
+        // Fetch all products
         const productsQuery = collection(db, 'products');
         const productsSnapshot = await getDocs(productsQuery);
-        const productsData = productsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const productsData = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setProducts(productsData);
+
+  // we rely on products to derive groupings; no separate groups fetch required
         setError('');
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -56,16 +55,52 @@ const Home = () => {
   }, []); // Remove selectedCategory dependency since we fetch all products
 
   // Filter products by search query and selected category (memoized)
+  // Grouped products: for products with a groupId, show a single representative (sample)
+  const groupedProducts = useMemo(() => {
+    const seenGroups = new Set();
+    const list = [];
+
+    for (const p of products) {
+      if (p.groupId) {
+        if (seenGroups.has(p.groupId)) continue;
+
+        // collect all variants for this group
+        const variants = products.filter(x => x.groupId === p.groupId);
+        const rep = p; // first encountered as representative
+        const prices = variants.map(v => parseFloat(v.price || 0)).filter(n => !Number.isNaN(n));
+        const minPrice = prices.length > 0 ? Math.min(...prices) : parseFloat(rep.price || 0);
+
+        list.push({
+          id: rep.id,
+          groupId: p.groupId,
+          name: rep.name,
+          image: rep.image,
+          category: rep.category,
+          description: rep.description,
+          price: rep.price,
+          groupMinPrice: minPrice,
+          variantCount: variants.length
+        });
+
+        seenGroups.add(p.groupId);
+      } else {
+        list.push(p);
+      }
+    }
+
+    return list;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const q = String(searchQuery ?? '').trim().toLowerCase();
-    return products.filter(product => {
+    return groupedProducts.filter(product => {
       const name = product && product.name != null ? String(product.name) : '';
       const matchesSearch = q === '' ? true : name.toLowerCase().includes(q);
       const categoryVal = product && product.category != null ? String(product.category) : '';
       const matchesCategory = selectedCategory ? categoryVal === selectedCategory : true;
       return matchesSearch && matchesCategory;
     });
-  }, [products, searchQuery, selectedCategory]);
+  }, [groupedProducts, searchQuery, selectedCategory]);
 
   // If categories from Firestore are empty, derive categories from products so sections won't disappear (memoized)
   const displayCategories = useMemo(() => {
@@ -282,8 +317,36 @@ return (
       {/* Products Section */}
       <main className="container-fluid py-8 pb-24">
         {displayCategories.map((category) => {
-          const categoryProducts = filteredProducts.filter(p => p.category === category.id);
-          if (categoryProducts.length === 0) return null;
+          const categoryProductsAll = filteredProducts.filter(p => p.category === category.id);
+          if (categoryProductsAll.length === 0) return null;
+
+          // Split products into grouped variants and standalone products
+          const groupedMap = {};
+          const standalone = [];
+          for (const p of categoryProductsAll) {
+            if (p.groupId) {
+              if (!groupedMap[p.groupId]) groupedMap[p.groupId] = [];
+              groupedMap[p.groupId].push(p);
+            } else {
+              standalone.push(p);
+            }
+          }
+
+          const groupItems = Object.keys(groupedMap).map((gid) => {
+            const variants = groupedMap[gid];
+            const rep = variants[0];
+            const minPrice = Math.min(...variants.map(v => parseFloat(v.price || 0)));
+            return {
+              id: gid,
+              isGroup: true,
+              image: rep.image,
+              name: rep.name,
+              price: minPrice,
+              variantCount: variants.length
+            };
+          });
+
+          const categoryProducts = [...groupItems, ...standalone];
 
           return (
             <section key={category.id} className="mb-8">
@@ -299,42 +362,57 @@ return (
                 onTouchMove={(e) => handleTouchMove(e, category.id)}
                 onTouchEnd={() => handleTouchEnd(category.id)}
               >
-                {categoryProducts.slice(0, ITEMS_PER_CATEGORY).map((product) => (
-                  <div key={product.id} className="min-w-[220px] w-56 flex-shrink-0 snap-start group bg-surface dark:bg-surface-dark rounded-xl overflow-hidden shadow hover:shadow-lg transition-all duration-300 p-3 md:p-4">
-                    <Link to={`/product/${product.id}`} className="block">
-                      <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="object-cover w-full h-full transition-all duration-500 group-hover:scale-110"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300" />
-                      </div>
+                {categoryProducts.slice(0, ITEMS_PER_CATEGORY).map((item) => (
+                  <div key={item.id} className="min-w-[220px] w-56 flex-shrink-0 snap-start group bg-surface dark:bg-surface-dark rounded-xl overflow-hidden shadow hover:shadow-lg transition-all duration-300 p-3 md:p-4">
+                    {item.isGroup ? (
+                      <a href={`/group/${item.id}`} className="block">
+                        <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                          <img src={item.image} alt={item.name} className="object-cover w-full h-full transition-all duration-500 group-hover:scale-110" loading="lazy" />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300" />
+                        </div>
 
-                      <div className="space-y-2">
-                        <div className="min-h-[2.5rem]">
-                          <h3 className="text-sm md:text-base font-medium text-text dark:text-text-dark line-clamp-2 group-hover:text-primary transition-colors duration-300">
-                            {product.name}
-                          </h3>
+                        <div className="space-y-2">
+                          <div className="min-h-[2.5rem]">
+                            <h3 className="text-sm md:text-base font-medium text-text dark:text-text-dark line-clamp-2 group-hover:text-primary transition-colors duration-300">
+                              {item.name} ({item.variantCount})
+                            </h3>
+                          </div>
+                          <div className="flex items-end justify-between">
+                            <span className="block text-primary font-bold text-base md:text-lg">From TZS {parseFloat(item.price).toLocaleString()}</span>
+                          </div>
                         </div>
-                        <div className="flex items-end justify-between">
-                          <span className="block text-primary font-bold text-base md:text-lg">TZS {parseFloat(product.price).toLocaleString()}</span>
-                          {product.oldPrice && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400 line-through">TZS {parseFloat(product.oldPrice).toLocaleString()}</span>
-                          )}
+                      </a>
+                    ) : (
+                      <Link to={`/product/${item.id}`} className="block">
+                        <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                          <img src={item.image} alt={item.name} className="object-cover w-full h-full transition-all duration-500 group-hover:scale-110" loading="lazy" />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300" />
                         </div>
-                      </div>
-                    </Link>
+
+                        <div className="space-y-2">
+                          <div className="min-h-[2.5rem]">
+                            <h3 className="text-sm md:text-base font-medium text-text dark:text-text-dark line-clamp-2 group-hover:text-primary transition-colors duration-300">
+                              {item.name}
+                            </h3>
+                          </div>
+                          <div className="flex items-end justify-between">
+                            <span className="block text-primary font-bold text-base md:text-lg">TZS {parseFloat(item.price).toLocaleString()}</span>
+                            {item.oldPrice && (
+                              <span className="text-xs text-gray-500 dark:text-gray-400 line-through">TZS {parseFloat(item.oldPrice).toLocaleString()}</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    )}
 
                     <button
-                      onClick={(e) => { e.preventDefault(); navigate(`/product/${product.id}`); }}
+                      onClick={(e) => { e.preventDefault(); navigate(item.isGroup ? `/group/${item.id}` : `/product/${item.id}`); }}
                       className="w-full mt-3 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M12 12h.01M9 12h.01" />
                       </svg>
-                      <span>View a product</span>
+                      <span>{item.isGroup ? 'View group' : 'View a product'}</span>
                     </button>
                   </div>
                 ))}
