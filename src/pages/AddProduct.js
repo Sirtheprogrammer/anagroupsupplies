@@ -20,12 +20,51 @@ const AddProduct = () => {
     description: '',
     price: '',
     category: '',
-    image: null
+    image: null,
+    sizingType: 'none', // 'none', 'standard', 'numeric', 'custom'
+    sizes: [], // Available sizes for the product
+    customSizes: '' // For custom size input
   });
   // Group mode: when true we collect shared fields once and allow multiple variants
   const [groupMode, setGroupMode] = useState(false);
   const [variants, setVariants] = useState([]);
   // variant image preview handled inline per-variant state
+
+  // Size management functions
+  const standardSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+  const numericSizes = Array.from({length: 16}, (_, i) => (36 + i).toString()); // 36-51
+
+  const getAvailableSizes = () => {
+    switch (formData.sizingType) {
+      case 'standard':
+        return standardSizes;
+      case 'numeric':
+        return numericSizes;
+      case 'custom':
+        return formData.customSizes.split(',').map(s => s.trim()).filter(s => s.length > 0);
+      default:
+        return [];
+    }
+  };
+
+  const handleSizeToggle = (size) => {
+    if (formData.sizingType === 'none') return;
+
+    setFormData(prev => ({
+      ...prev,
+      sizes: prev.sizes.includes(size)
+        ? prev.sizes.filter(s => s !== size)
+        : [...prev.sizes, size]
+    }));
+  };
+
+  const handleCustomSizesChange = (value) => {
+    setFormData(prev => ({
+      ...prev,
+      customSizes: value,
+      sizes: value.split(',').map(s => s.trim()).filter(s => s.length > 0)
+    }));
+  };
 
   const handleAddVariant = () => {
     setVariants(prev => ([...prev, { id: `v-${Date.now()}`, price: '', sku: '', attributes: { color: '' }, image: null }]));
@@ -163,6 +202,11 @@ const AddProduct = () => {
       errors.category = 'Please select a category';
     }
 
+    // Validate sizing
+    if (formData.sizingType !== 'none' && formData.sizes.length === 0) {
+      errors.sizing = 'Please select at least one size or choose "No sizing required"';
+    }
+
     // If not in group mode, main product image is required. If in group mode,
     // at least one variant with an image must exist (we validate below).
     if (!groupMode && !formData.image) {
@@ -220,6 +264,8 @@ const AddProduct = () => {
           name: formData.name.trim(),
           description: formData.description.trim(),
           category: formData.category,
+          sizingType: formData.sizingType,
+          sizes: formData.sizes,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
@@ -244,6 +290,8 @@ const AddProduct = () => {
           description: formData.description.trim(),
           price: parseFloat(formData.price),
           category: formData.category,
+          sizingType: formData.sizingType,
+          sizes: formData.sizes,
           image: imageUrl,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -448,6 +496,77 @@ const AddProduct = () => {
             <p className="mt-2 text-sm text-red-600 flex items-center">
               <ExclamationTriangleIcon className="h-4 w-4 mr-1 flex-shrink-0" />
               {validationErrors.category}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Sizing</label>
+          <select
+            name="sizingType"
+            value={formData.sizingType}
+            onChange={handleChange}
+            disabled={isSubmitting}
+            className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors mb-3"
+          >
+            <option value="none">No sizing required</option>
+            <option value="standard">Standard sizes (XS, S, M, L, XL, etc.)</option>
+            <option value="numeric">Numeric sizes (36, 37, 38, etc.)</option>
+            <option value="custom">Custom sizes (enter your own)</option>
+          </select>
+
+          {(formData.sizingType === 'standard' || formData.sizingType === 'numeric') && (
+            <>
+              <p className="text-xs text-gray-500 mb-3">Select all sizes that will be available for this product</p>
+              <div className={`grid gap-2 ${
+                formData.sizingType === 'standard'
+                  ? 'grid-cols-4 sm:grid-cols-7'
+                  : 'grid-cols-5 sm:grid-cols-8'
+              }`}>
+                {getAvailableSizes().map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => handleSizeToggle(size)}
+                    disabled={isSubmitting}
+                    className={`px-3 py-2 text-sm font-medium rounded-lg border-2 transition-all duration-200 touch-manipulation ${
+                      formData.sizes.includes(size)
+                        ? 'bg-primary text-white border-primary shadow-lg'
+                        : 'bg-white dark:bg-surface-dark text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {formData.sizingType === 'custom' && (
+            <>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Sizes</label>
+              <p className="text-xs text-gray-500 mb-3">Enter sizes separated by commas (e.g., "Small, Medium, Large, 36, 38")</p>
+              <input
+                type="text"
+                value={formData.customSizes}
+                onChange={(e) => handleCustomSizesChange(e.target.value)}
+                disabled={isSubmitting}
+                placeholder="Small, Medium, Large, 36, 38"
+                className="block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+              />
+            </>
+          )}
+
+          {formData.sizes.length > 0 && (
+            <p className="text-xs text-gray-500 mt-2">
+              Selected sizes: {formData.sizes.join(', ')}
+            </p>
+          )}
+
+          {validationErrors.sizing && (
+            <p className="mt-2 text-sm text-red-600 flex items-center">
+              <ExclamationTriangleIcon className="h-4 w-4 mr-1 flex-shrink-0" />
+              {validationErrors.sizing}
             </p>
           )}
         </div>

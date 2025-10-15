@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -15,6 +15,7 @@ const Home = () => {
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [cartItems, setCartItems] = useState({});
   const scrollRefs = useRef({});
   const ITEMS_PER_CATEGORY = 8; // limit items rendered per category to improve performance
 
@@ -210,6 +211,58 @@ const Home = () => {
     requestAnimationFrame(animateScroll);
   };
 
+  // Check if product requires size selection
+  const requiresSizeSelection = (product) => {
+    return product.sizes && product.sizes.length > 0;
+  };
+
+  // Add item to cart with size selection
+  const addToCartWithSize = async (product) => {
+    if (requiresSizeSelection(product)) {
+      // Redirect to product detail page for size selection
+      navigate(`/product/${product.id}`);
+      return;
+    }
+
+    try {
+      // Use the existing cart functionality from Cart component
+      const cartRef = doc(db, 'carts', 'current-user-id'); // This should use actual user ID
+      const itemsRef = collection(cartRef, 'items');
+
+      // For products without size requirements, check if item exists
+      const existingItemsSnapshot = await getDocs(itemsRef);
+      const existingItem = existingItemsSnapshot.docs.find(doc => {
+        const data = doc.data();
+        return data.productId === product.id;
+      });
+
+      if (existingItem) {
+        // Update quantity if item exists
+        await updateDoc(existingItem.ref, {
+          quantity: existingItem.data().quantity + 1
+        });
+        toast.success('Item quantity updated in cart');
+      } else {
+        // Add new item (products without size requirements go directly to cart)
+        const { addDoc } = await import('firebase/firestore');
+        const newItem = {
+          productId: product.id,
+          name: product.name,
+          price: parseFloat(product.price),
+          image: product.image,
+          quantity: 1,
+          addedAt: new Date().toISOString()
+        };
+
+        await addDoc(itemsRef, newItem);
+        toast.success('Item added to cart');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background dark:bg-background-dark">
@@ -401,15 +454,39 @@ return (
                       </Link>
                     )}
 
-                    <button
-                      onClick={(e) => { e.preventDefault(); navigate(item.isGroup ? `/group/${item.id}` : `/product/${item.id}`); }}
-                      className="w-full mt-3 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M12 12h.01M9 12h.01" />
-                      </svg>
-                      <span>{item.isGroup ? 'View group' : 'View a product'}</span>
-                    </button>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(item.isGroup ? `/group/${item.id}` : `/product/${item.id}`);
+                        }}
+                        className="flex-1 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M12 12h.01M9 12h.01" />
+                        </svg>
+                        <span>{item.isGroup ? 'View Group' : 'View Product'}</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (requiresSizeSelection(item)) {
+                            // Redirect to product detail page for size selection
+                            navigate(item.isGroup ? `/group/${item.id}` : `/product/${item.id}`);
+                          } else {
+                            // Add directly to cart for products without size requirements
+                            addToCartWithSize(item);
+                          }
+                        }}
+                        className="flex-1 bg-accent hover:bg-accent/80 text-white px-3 py-2 rounded-lg transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-1 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span>Add to Cart</span>
+                      </button>
+                    </div>
                   </div>
                 ))}
 

@@ -47,7 +47,9 @@ service cloud.firestore {
         ((incoming.stock is number && incoming.stock >= 0) || !incoming.keys().hasAny(['stock'])) &&
         ((incoming.createdAt is timestamp) || (incoming.createdAt is string)) &&
         ((incoming.images is list) || (incoming.image is string) || !incoming.keys().hasAny(['images','image'])) &&
-        ((incoming.variants is list) || !incoming.keys().hasAny(['variants']));
+        ((incoming.variants is list) || !incoming.keys().hasAny(['variants'])) &&
+        ((incoming.sizes is list) || !incoming.keys().hasAny(['sizes'])) &&
+        ((incoming.sizingType is string) || !incoming.keys().hasAny(['sizingType']));
     }
 
     function isValidOrder() {
@@ -103,7 +105,9 @@ service cloud.firestore {
       let item = request.resource.data;
       return item.productId is string &&
         item.quantity is number && item.quantity > 0 &&
-        item.price is number && item.price >= 0;
+        item.price is number && item.price >= 0 &&
+        ((item.selectedSize is string) || !item.keys().hasAny(['selectedSize'])) &&
+        ((item.sizingType is string) || !item.keys().hasAny(['sizingType']));
     }
 
     // Products collection rules
@@ -227,8 +231,9 @@ service cloud.firestore {
       
       match /items/{itemId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && 
-                            request.resource.data.keys().hasAll(['productId', 'addedAt']);
+        allow create, update: if isOwner(userId) &&
+                             request.resource.data.keys().hasAll(['productId', 'addedAt']) &&
+                             ((request.resource.data.selectedSize is string) || !request.resource.data.keys().hasAny(['selectedSize']));
         allow delete: if isOwner(userId);
       }
     }

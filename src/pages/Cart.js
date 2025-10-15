@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -73,6 +73,59 @@ const Cart = () => {
     return `TZS ${parseFloat(price).toLocaleString()}`;
   };
 
+  // Add item to cart with size selection (for use in other components)
+  const addToCartWithSize = async (productId, productData, selectedSize) => {
+    if (!user) {
+      toast.error('Please login to add items to cart');
+      return;
+    }
+
+    if (productData.sizes && productData.sizes.length > 0 && !selectedSize) {
+      toast.error('Please select a size');
+      return;
+    }
+
+    try {
+      const cartRef = doc(db, 'carts', user.uid);
+      const itemsRef = collection(cartRef, 'items');
+
+      // Check if item with same size already exists
+      const existingItemsSnapshot = await getDocs(itemsRef);
+      const existingItem = existingItemsSnapshot.docs.find(doc => {
+        const data = doc.data();
+        return data.productId === productId && data.selectedSize === selectedSize;
+      });
+
+      if (existingItem) {
+        // Update quantity if item exists
+        await updateDoc(existingItem.ref, {
+          quantity: existingItem.data().quantity + 1
+        });
+        toast.success('Item quantity updated in cart');
+      } else {
+        // Add new item
+        const newItem = {
+          productId,
+          name: productData.name,
+          price: parseFloat(productData.price),
+          image: productData.image,
+          selectedSize: selectedSize || null,
+          sizingType: productData.sizingType || 'none',
+          quantity: 1,
+          addedAt: new Date().toISOString()
+        };
+
+        await addDoc(itemsRef, newItem);
+        toast.success('Item added to cart');
+      }
+
+      fetchCartItems();
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast.error('Failed to add item to cart');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -117,6 +170,11 @@ const Cart = () => {
                       <div className="flex-1 min-w-0">
                         <Link to={`/product/${item.id}`} className="block">
                           <h2 className="text-sm font-semibold text-text dark:text-text-dark truncate">{item.name}</h2>
+                          {item.selectedSize && (
+                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                               {item.sizingType === 'numeric' ? 'EU Size' : 'Size'}: {item.selectedSize}
+                             </p>
+                           )}
                         </Link>
                         <div className="flex items-center justify-between mt-1">
                           <div className="text-sm text-gray-600 dark:text-gray-400">{formatPrice(item.price)}</div>

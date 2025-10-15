@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, setDoc, collection, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -22,6 +22,9 @@ const ProductDetail = () => {
   const [imagePreview, setImagePreview] = useState('');
   const [categories, setCategories] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
+  const [selectedSize, setSelectedSize] = useState('');
+  const [showSizeSelector, setShowSizeSelector] = useState(false);
+  const sizeSelectorRef = useRef(null);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -86,6 +89,36 @@ const ProductDetail = () => {
     fetchCategories();
   }, [fetchProduct, fetchCategories]);
 
+  // Close size selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sizeSelectorRef.current && !sizeSelectorRef.current.contains(event.target)) {
+        setShowSizeSelector(false);
+      }
+    };
+
+    if (showSizeSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showSizeSelector]);
+
+  // Size handling functions
+  const requiresSizeSelection = (product) => {
+    return product && product.sizes && product.sizes.length > 0;
+  };
+
+  const getSizeTypeLabel = (product) => {
+    if (!product || !product.sizingType || product.sizingType === 'none') return '';
+    return product.sizingType === 'standard' ? 'Size' :
+           product.sizingType === 'numeric' ? 'EU Size' : 'Size';
+  };
+
   const handleAddToCart = async () => {
     if (!user) {
       toast.error('Please login to add items to cart');
@@ -93,18 +126,27 @@ const ProductDetail = () => {
       return;
     }
 
+    // Check if size selection is required but not selected
+    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+    if (requiresSizeSelection(currentProduct) && !selectedSize) {
+      toast.error(`Please select ${getSizeTypeLabel(currentProduct).toLowerCase()} first`);
+      setShowSizeSelector(true);
+      return;
+    }
+
     try {
-      const selected = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+      const selected = currentProduct;
       const cartRef = doc(db, 'carts', user.uid);
-      // use variant id as the item id to allow multiple variants
       const cartItemRef = doc(db, `carts/${user.uid}/items`, selected.id);
-      
+
       await setDoc(cartItemRef, {
         productId: selected.id,
         groupId: selected.groupId || null,
         name: selected.name,
         price: selected.price,
         image: selected.image,
+        selectedSize: selectedSize || null,
+        sizingType: selected.sizingType || 'none',
         quantity: quantity,
         addedAt: new Date().toISOString()
       }, { merge: true });
@@ -123,16 +165,26 @@ const ProductDetail = () => {
       return;
     }
 
+    // Check if size selection is required but not selected
+    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+    if (requiresSizeSelection(currentProduct) && !selectedSize) {
+      toast.error(`Please select ${getSizeTypeLabel(currentProduct).toLowerCase()} first`);
+      setShowSizeSelector(true);
+      return;
+    }
+
     try {
-      const selected = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+      const selected = currentProduct;
       const wishlistItemRef = doc(db, `wishlists/${user.uid}/items`, selected.id);
-      
+
       await setDoc(wishlistItemRef, {
         productId: selected.id,
         groupId: selected.groupId || null,
         name: selected.name,
         price: selected.price,
         image: selected.image,
+        selectedSize: selectedSize || null,
+        sizingType: selected.sizingType || 'none',
         addedAt: new Date().toISOString()
       }, { merge: true });
 
@@ -263,7 +315,7 @@ const ProductDetail = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Product Image */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-surface dark:bg-surface-dark rounded-lg shadow-md overflow-hidden">
           {isEditing ? (
             <div className="p-4">
               <input
@@ -341,11 +393,11 @@ const ProductDetail = () => {
         </div>
 
         {/* Product Details */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-surface dark:bg-surface-dark rounded-lg shadow-md p-6">
           {isEditing ? (
             <>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
                   Product Name
                 </label>
                 <input
@@ -361,7 +413,7 @@ const ProductDetail = () => {
                 )}
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
                   Price (TZS)
                 </label>
                 <input
@@ -377,7 +429,7 @@ const ProductDetail = () => {
                 )}
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
                   Category
                 </label>
                 <select
@@ -399,7 +451,7 @@ const ProductDetail = () => {
                 )}
               </div>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
                   Description
                 </label>
                 <textarea
@@ -434,7 +486,7 @@ const ProductDetail = () => {
           ) : (
             <>
               <div className="flex justify-between items-start mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+                <h1 className="text-3xl font-bold text-text-primary dark:text-text-dark-primary">{product.name}</h1>
                 {user?.isAdmin && (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -444,14 +496,88 @@ const ProductDetail = () => {
                   </button>
                 )}
               </div>
+
+              {/* Size requirement indicator */}
+              {(() => {
+                const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                return requiresSizeSelection(currentProduct) && !selectedSize ? (
+                  <div className="mb-4 p-3 bg-warning/10 dark:bg-warning/20 border border-warning/30 dark:border-warning/40 rounded-lg">
+                    <p className="text-sm text-warning dark:text-warning-100 flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Please select {getSizeTypeLabel(currentProduct).toLowerCase()} to continue
+                    </p>
+                  </div>
+                ) : null;
+              })()}
+
               <p className="text-2xl font-semibold text-primary mb-4">
                 TZS {parseFloat((variants && variants.length > 0 ? variants[selectedVariantIndex].price : product.price)).toLocaleString()}
               </p>
-              <p className="text-gray-600 mb-6">{(variants && variants.length > 0 ? variants[selectedVariantIndex].description || product.description : product.description)}</p>
+              <p className="text-text-secondary dark:text-text-dark-secondary mb-6">{(variants && variants.length > 0 ? variants[selectedVariantIndex].description || product.description : product.description)}</p>
+
+              {/* Size Selection */}
+              {(() => {
+                const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                return requiresSizeSelection(currentProduct) ? (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
+                      {getSizeTypeLabel(currentProduct)} *
+                    </label>
+
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowSizeSelector(!showSizeSelector)}
+                        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      >
+                        <span className={selectedSize ? 'text-text-primary dark:text-text-dark-primary' : 'text-text-tertiary dark:text-text-dark-tertiary'}>
+                          {selectedSize || `Select ${getSizeTypeLabel(currentProduct).toLowerCase()}`}
+                        </span>
+                        <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${showSizeSelector ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {showSizeSelector && (
+                        <div ref={sizeSelectorRef} className="absolute top-full left-0 right-0 mt-1 bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-lg shadow-lg z-10">
+                          <div className={`grid gap-2 p-3 ${
+                            currentProduct.sizingType === 'numeric'
+                              ? 'grid-cols-5 sm:grid-cols-8'
+                              : 'grid-cols-4 sm:grid-cols-6'
+                          }`}>
+                            {currentProduct.sizes.map((size) => (
+                              <button
+                                key={size}
+                                onClick={() => {
+                                  setSelectedSize(size);
+                                  setShowSizeSelector(false);
+                                }}
+                                className={`px-3 py-2 text-sm font-medium rounded border-2 transition-all duration-200 ${
+                                  selectedSize === size
+                                    ? 'bg-primary text-white border-primary shadow-lg'
+                                    : 'bg-surface dark:bg-surface-dark text-text-secondary dark:text-text-dark-secondary border-border dark:border-border-dark hover:border-primary hover:bg-primary/5'
+                                }`}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="p-3 border-t border-border dark:border-border-dark bg-background-secondary dark:bg-background-dark-secondary rounded-b-lg">
+                            <p className="text-xs text-text-tertiary dark:text-text-dark-tertiary text-center">
+                              {currentProduct.sizes.length} sizes available
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
               {/* Quantity Selector */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2">
                   Quantity
                 </label>
                 <div className="flex items-center space-x-4">
@@ -475,17 +601,49 @@ const ProductDetail = () => {
               <div className="flex space-x-4">
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 bg-primary text-white py-3 px-6 rounded-md hover:bg-primary-dark transition-colors duration-300 flex items-center justify-center"
+                  disabled={(() => {
+                    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                    return requiresSizeSelection(currentProduct) && !selectedSize;
+                  })()}
+                  className={`flex-1 py-3 px-6 rounded-md transition-colors duration-300 flex items-center justify-center ${
+                    (() => {
+                      const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                      return requiresSizeSelection(currentProduct) && !selectedSize
+                        ? 'bg-gray-400 cursor-not-allowed text-white'
+                        : 'bg-primary text-white hover:bg-primary-dark';
+                    })()
+                  }`}
                 >
                   <ShoppingCartIcon className="h-5 w-5 mr-2" />
-                  Add to Cart
+                  {(() => {
+                    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                    return requiresSizeSelection(currentProduct) && !selectedSize
+                      ? `Select ${getSizeTypeLabel(currentProduct)}`
+                      : 'Add to Cart';
+                  })()}
                 </button>
                 <button
                   onClick={handleAddToWishlist}
-                  className="flex-1 border border-primary text-primary py-3 px-6 rounded-md hover:bg-primary hover:text-white transition-colors duration-300 flex items-center justify-center"
+                  disabled={(() => {
+                    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                    return requiresSizeSelection(currentProduct) && !selectedSize;
+                  })()}
+                  className={`flex-1 py-3 px-6 rounded-md transition-colors duration-300 flex items-center justify-center ${
+                    (() => {
+                      const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                      return requiresSizeSelection(currentProduct) && !selectedSize
+                        ? 'border-gray-400 text-gray-400 cursor-not-allowed'
+                        : 'border-primary text-primary hover:bg-primary hover:text-white';
+                    })()
+                  }`}
                 >
                   <HeartIcon className="h-5 w-5 mr-2" />
-                  Add to Wishlist
+                  {(() => {
+                    const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
+                    return requiresSizeSelection(currentProduct) && !selectedSize
+                      ? `Select ${getSizeTypeLabel(currentProduct)}`
+                      : 'Add to Wishlist';
+                  })()}
                 </button>
               </div>
             </>
