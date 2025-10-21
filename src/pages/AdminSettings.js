@@ -131,6 +131,9 @@ const AdminSettings = () => {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Enter number with country code (e.g., 255683568254 for Tanzania)
               </p>
+              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                <strong>Note:</strong> Orders now include product images, size information, and enhanced formatting for better order processing.
+              </div>
             </div>
           </div>
 
@@ -207,32 +210,72 @@ const AdminSettings = () => {
       <div className="mt-6 bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-3 flex items-center">
           <PhoneIcon className="h-4 w-4 mr-2" />
-          WhatsApp Integration Preview
+          WhatsApp Order Preview
         </h3>
 
         <div className="bg-white dark:bg-surface-dark rounded-lg p-3 mb-3 border border-green-200 dark:border-green-800">
-          <p className="text-xs font-medium text-green-800 dark:text-green-200 mb-2">Sample Order Message:</p>
-          <div className="text-xs text-gray-700 dark:text-gray-300 font-mono bg-gray-50 dark:bg-gray-800 p-2 rounded">
-            *New Order*
+          <p className="text-xs font-medium text-green-800 dark:text-green-200 mb-2">How orders will appear on WhatsApp:</p>
+          <div className="text-xs text-gray-700 dark:text-gray-300 font-mono bg-gray-50 dark:bg-gray-800 p-3 rounded whitespace-pre-line">
+            {`🛒 NEW ORDER
 
-*Order Items:*
-Sample Product x 2 @ TZS 50,000 = TZS 100,000
+Order Items:
+*1. Sample Jersey (Size: L)*
+   📏 Size: L
+   🔢 Quantity: 2
+   💰 Unit Price: TZS 50,000
+   💎 Subtotal: TZS 100,000
+   🖼️ Image: [Product Image Link]
 
-*Total: TZS 100,000*
+*2. Sample Shoes (EU Size: 42)*
+   📏 EU Size: 42
+   🔢 Quantity: 1
+   💰 Unit Price: TZS 75,000
+   💎 Subtotal: TZS 75,000
+   🖼️ Image: [Product Image Link]
 
-*Shipping Information:*
-Name: John Doe
-Phone: +255123456789
-...
+Total: TZS 175,000
+
+📦 DELIVERY DETAILS:
+👤 Customer: John Doe
+📞 Contact: +255712345678
+✉️ Email: john@example.com
+
+🏠 Delivery Address:
+123 Main Street
+Dar es Salaam, Ilala 11000
+Tanzania
+
+📋 Order Summary:
+• Items: 2
+• Total: TZS 175,000
+• Status: Pending Confirmation
+• Order Time: ${new Date().toLocaleString('en-TZ')}
+
+💬 Please confirm this order and arrange delivery.`}
           </div>
         </div>
 
-        <p className="text-sm text-green-700 dark:text-green-300">
-          📱 Orders will be sent to: <strong>+{settings.whatsappNumber}</strong>
-        </p>
-        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-          This number receives all customer orders via WhatsApp when they complete checkout
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-green-700 dark:text-green-300">
+              📱 Orders sent to: <strong>+{settings.whatsappNumber}</strong>
+            </p>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+              Images and size details included for easy order processing
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-green-600 dark:text-green-400">
+              Features:
+            </div>
+            <div className="text-xs text-green-600 dark:text-green-400">
+              ✅ Product Images<br/>
+              ✅ Size Information<br/>
+              ✅ Quantity Details<br/>
+              ✅ Customer Contact
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -81,22 +81,45 @@ const Checkout = () => {
 
     const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    const orderDetails = cartItems.map(item =>
-      `${item.name} x ${item.quantity} @ ${formatPrice(item.price)} = ${formatPrice(item.price * item.quantity)}`
-    ).join('\n');
+    // Enhanced order details with images and size information
+    const orderDetails = cartItems.map((item, index) => {
+      let itemDetails = `*${index + 1}. ${item.name}*`;
 
-    const message = `*New Order*\n\n` +
+      // Add size information if available
+      if (item.selectedSize && item.selectedSize !== 'none') {
+        const sizeLabel = item.sizingType === 'numeric' ? 'EU Size' : 'Size';
+        itemDetails += `\n   📏 ${sizeLabel}: ${item.selectedSize}`;
+      }
+
+      itemDetails += `\n   🔢 Quantity: ${item.quantity}`;
+      itemDetails += `\n   💰 Unit Price: ${formatPrice(item.price)}`;
+      itemDetails += `\n   💎 Subtotal: ${formatPrice(item.price * item.quantity)}`;
+
+      // Add image preview link if available
+      if (item.image) {
+        itemDetails += `\n   🖼️ Image: ${item.image}`;
+      }
+
+      return itemDetails;
+    }).join('\n\n');
+
+    const message = `*🛒 NEW ORDER*\n\n` +
       `*Order Items:*\n${orderDetails}\n\n` +
       `*Total: ${formatPrice(total)}*\n\n` +
-      `*Shipping Information:*\n` +
-      `Name: ${shippingDetails.fullName}\n` +
-      `Phone: ${shippingDetails.phone}\n` +
-      `Email: ${shippingDetails.email}\n` +
-      `Address: ${shippingDetails.streetAddress}\n` +
-      `City: ${shippingDetails.city}\n` +
-      `Region: ${shippingDetails.state}\n` +
-      `Postal Code: ${shippingDetails.postalCode}\n` +
-      `Country: ${shippingDetails.country}`;
+      `*📦 DELIVERY DETAILS:*\n` +
+      `👤 Customer: ${shippingDetails.fullName}\n` +
+      `📞 Contact: ${shippingDetails.phone}\n` +
+      `✉️ Email: ${shippingDetails.email}\n\n` +
+      `*🏠 Delivery Address:*\n` +
+      `${shippingDetails.streetAddress}\n` +
+      `${shippingDetails.city}, ${shippingDetails.state} ${shippingDetails.postalCode}\n` +
+      `${shippingDetails.country}\n\n` +
+      `*📋 Order Summary:*\n` +
+      `• Items: ${cartItems.length}\n` +
+      `• Total: ${formatPrice(total)}\n` +
+      `• Status: Pending Confirmation\n` +
+      `• Order Time: ${new Date().toLocaleString('en-TZ')}\n\n` +
+      `*💬 Please confirm this order and arrange delivery.*`;
 
     return { message, cartItems };
   };
