@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, limit, where, getCountFromServer } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where, getCountFromServer, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import analyticsService from '../services/analyticsService';
 import {
@@ -18,7 +18,8 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   ArrowUpIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  PhoneIcon
 } from '@heroicons/react/24/outline';
 
 const AdminPanel = () => {
@@ -40,6 +41,7 @@ const AdminPanel = () => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
   const [recentActivities, setRecentActivities] = useState([]);
+  const [whatsappNumber, setWhatsappNumber] = useState('255683568254');
   const intervalRef = useRef(null);
   const isFetchingRef = useRef(false);
   const lastRefreshRef = useRef(0);
@@ -188,6 +190,25 @@ const AdminPanel = () => {
     }
   }, []);
 
+  // Fetch WhatsApp number from settings
+  const fetchWhatsappSettings = useCallback(async () => {
+    try {
+      const generalSettingsRef = doc(db, 'settings', 'general');
+      const generalSettingsSnap = await getDoc(generalSettingsRef);
+
+      if (generalSettingsSnap.exists()) {
+        const settings = generalSettingsSnap.data();
+        setWhatsappNumber(settings.whatsappNumber || '255683568254');
+      }
+    } catch (error) {
+      console.error('Error fetching WhatsApp settings:', error);
+      if (error.code === 'permission-denied') {
+        console.warn('Cannot access settings collection. Please deploy updated Firestore rules.');
+      }
+      // Keep default number as fallback
+    }
+  }, []);
+
   // Fetch all dashboard data (function declaration)
   const fetchAllData = useCallback(async () => {
     if (isFetchingRef.current) return; // prevent overlapping
@@ -198,7 +219,8 @@ const AdminPanel = () => {
       await Promise.all([
         fetchStats(),
         fetchRealTimeMetrics(),
-        fetchRecentActivities()
+        fetchRecentActivities(),
+        fetchWhatsappSettings()
       ]);
 
       // Schedule analytics fetch after a short delay if tab is visible and analytics not loaded yet
@@ -214,7 +236,7 @@ const AdminPanel = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [fetchStats, fetchRealTimeMetrics, fetchRecentActivities, fetchAnalytics]);
+  }, [fetchStats, fetchRealTimeMetrics, fetchRecentActivities, fetchWhatsappSettings, fetchAnalytics]);
 
   useEffect(() => {
     // initial load
@@ -440,6 +462,37 @@ const AdminPanel = () => {
             <ArrowPathIcon className="h-4 w-4 mr-2" />
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* WhatsApp Settings - Critical Business Setting */}
+      <div className="mb-6 md:mb-8">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800 p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900 flex-shrink-0">
+                <PhoneIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">
+                  WhatsApp Order Number
+                </h3>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  Current number: <strong>+{whatsappNumber}</strong>
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  This number receives all customer orders via WhatsApp
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/admin/settings"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-300"
+            >
+              <PhoneIcon className="h-4 w-4 mr-2" />
+              Manage Settings
+            </Link>
+          </div>
         </div>
       </div>
 

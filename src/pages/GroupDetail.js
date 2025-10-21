@@ -84,7 +84,6 @@ const GroupDetail = () => {
     }
 
     try {
-      const cartRef = doc(db, 'carts', user.uid);
       const cartItemRef = doc(db, `carts/${user.uid}/items`, selected.id);
 
       await setDoc(cartItemRef, {

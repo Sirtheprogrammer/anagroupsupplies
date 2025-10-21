@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, setDoc, collection, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
@@ -136,7 +136,6 @@ const ProductDetail = () => {
 
     try {
       const selected = currentProduct;
-      const cartRef = doc(db, 'carts', user.uid);
       const cartItemRef = doc(db, `carts/${user.uid}/items`, selected.id);
 
       await setDoc(cartItemRef, {

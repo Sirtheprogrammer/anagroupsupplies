@@ -10,6 +10,7 @@ import {
   HomeIcon,
   Square3Stack3DIcon,
   Cog6ToothIcon,
+  WrenchScrewdriverIcon,
   UserGroupIcon,
   PlusIcon,
   XMarkIcon,
@@ -41,6 +42,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Manage Products', path: '/admin/products', icon: ShoppingBagIcon },
     { name: 'Add Product', path: '/admin/products/add', icon: PlusIcon },
     { name: 'Admin Orders', path: '/admin/orders', icon: ClipboardDocumentListIcon },
+    { name: 'Settings', path: '/admin/settings', icon: WrenchScrewdriverIcon },
   ] : [];
 
   const isActive = (path) => {

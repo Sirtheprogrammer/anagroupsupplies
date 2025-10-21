@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { collection, addDoc, doc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDocs, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 
@@ -9,6 +9,45 @@ const Checkout = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState('255683568254'); // Default fallback
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  // Fetch WhatsApp number from settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        // Try general settings first
+        const generalSettingsRef = doc(db, 'settings', 'general');
+        const generalSettingsSnap = await getDoc(generalSettingsRef);
+
+        if (generalSettingsSnap.exists()) {
+          const settings = generalSettingsSnap.data();
+          setWhatsappNumber(settings.whatsappNumber || '255683568254');
+          return;
+        }
+
+        // Fallback to whatsapp-specific settings
+        const whatsappSettingsRef = doc(db, 'settings', 'whatsapp');
+        const whatsappSettingsSnap = await getDoc(whatsappSettingsRef);
+
+        if (whatsappSettingsSnap.exists()) {
+          const settings = whatsappSettingsSnap.data();
+          setWhatsappNumber(settings.number || '255683568254');
+        }
+      } catch (error) {
+        console.error('Error fetching WhatsApp settings:', error);
+        // Show user-friendly error message if it's a permissions issue
+        if (error.code === 'permission-denied') {
+          console.warn('Settings collection not accessible. Using default WhatsApp number.');
+        }
+        // Keep default number as fallback
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, []);
   const [shippingDetails, setShippingDetails] = useState({
     fullName: '',
     email: '',
@@ -64,6 +103,12 @@ const Checkout = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (settingsLoading) {
+      toast.info('Loading settings... Please wait a moment.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -92,7 +137,6 @@ const Checkout = () => {
       }
 
       // Open WhatsApp with the generated message
-      const whatsappNumber = '255683568254'; // Replace with your actual WhatsApp number
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
 

@@ -17,7 +17,6 @@ const Home = () => {
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cartItems, setCartItems] = useState({});
   const scrollRefs = useRef({});
   const ITEMS_PER_CATEGORY = 8; // limit items rendered per category to improve performance
 
@@ -112,15 +111,6 @@ const Home = () => {
     return Array.from(map.values());
   }, [categories, products]);
 
-  // Simplified smooth scrolling for better mobile performance
-  const scrollToItem = (direction, categoryId) => {
-    const container = scrollRefs.current[categoryId];
-    if (!container) return;
-
-    const itemWidth = 220; // Card width + gap
-    const scrollAmount = direction === 'left' ? -itemWidth : itemWidth;
-    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-  };
 
   // Check if product requires size selection
   const requiresSizeSelection = (product) => {

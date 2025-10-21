@@ -20,7 +20,8 @@ import {
   ClipboardDocumentListIcon,
   PlusIcon,
   MagnifyingGlassIcon,
-  TagIcon
+  TagIcon,
+  WrenchScrewdriverIcon
 } from '@heroicons/react/24/outline';
 
 const Navbar = ({ onMenuClick }) => {
@@ -187,6 +188,14 @@ const Navbar = ({ onMenuClick }) => {
                             >
                               <ClipboardDocumentListIcon className="h-5 w-5 mr-3 text-primary" />
                               Orders
+                            </Link>
+                            <Link
+                              to="/admin/settings"
+                              className="flex items-center px-4 py-3 text-sm font-medium hover:bg-background-secondary dark:hover:bg-background-dark-secondary transition-colors duration-200"
+                              onClick={() => setShowAdminDropdown(false)}
+                            >
+                              <WrenchScrewdriverIcon className="h-5 w-5 mr-3 text-primary" />
+                              Settings
                             </Link>
                           </div>
                         </div>
