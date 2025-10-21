@@ -161,9 +161,12 @@ export const AuthProvider = ({ children }) => {
             const userDataPromise = getOrCreateUserProfile(firebaseUser);
             const adminCheckPromise = checkAdminStatus(firebaseUser.uid);
             
-            // Use Promise.race to timeout these operations
+            // Use Promise.race to timeout these operations (increased timeout for better reliability)
             const timeoutPromise = new Promise((_, reject) => {
-              timeoutId = setTimeout(() => reject(new Error('User setup timeout')), 5000);
+              timeoutId = setTimeout(() => {
+                console.warn('User setup timeout - this may be due to slow network or Firebase issues');
+                reject(new Error('User setup timeout - please check your connection and try again'));
+              }, 15000);
             });
             
             const [userData, isAdmin] = await Promise.race([
@@ -201,15 +204,20 @@ export const AuthProvider = ({ children }) => {
           } catch (error) {
             console.error('Error setting up user:', error);
             clearTimeout(timeoutId);
-            
-            // Fallback to basic user object
+
+            // Fallback to basic user object with better error handling
             setUser({
               ...firebaseUser,
               isAdmin: false,
-              displayName: firebaseUser.displayName || 'User',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
               email: firebaseUser.email
             });
             setUserProfile(null);
+
+            // Show user-friendly error message
+            if (error.message.includes('timeout')) {
+              console.warn('User setup timed out, but continuing with basic user object');
+            }
           }
         } else {
           // User logged out

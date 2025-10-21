@@ -32,15 +32,19 @@ import Contact from './pages/Contact';
 import Shipping from './pages/Shipping';
 
 const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Loading AnA Group</h2>
-          <p className="text-gray-500">Please wait while we set up your experience...</p>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">
+            {user ? 'Setting up your account...' : 'Loading AnA Group'}
+          </h2>
+          <p className="text-gray-500">
+            {user ? 'Please wait while we load your profile...' : 'Please wait while we set up your experience...'}
+          </p>
         </div>
       </div>
     );

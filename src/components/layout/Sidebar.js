@@ -69,7 +69,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       />
 
       {/* Sidebar Panel */}
-      <div className={`fixed top-0 left-0 h-full w-80 bg-white dark:bg-surface-dark shadow-2xl z-50 transform transition-all duration-300 ease-out ${
+      <div className={`fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-surface-dark shadow-2xl z-50 transform transition-all duration-300 ease-out flex flex-col ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         
@@ -94,7 +94,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         </div>
 
         {/* Navigation Content */}
-        <div className="flex-1 overflow-y-auto py-6">
+        <div className="sidebar-scroll">
           
           {/* Main Navigation */}
           <nav className="px-6">
@@ -126,11 +126,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
           {/* User Section */}
           {user && userMenuItems.length > 0 && (
-            <div className="mt-8 px-6">
+            <div className="mt-6 px-6">
               <h3 className="text-xs font-semibold text-text-tertiary dark:text-text-dark-tertiary uppercase tracking-wider mb-3 px-4">
                 My Account
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {userMenuItems.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -159,11 +159,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
           {/* Admin Section */}
           {user?.isAdmin && adminMenuItems.length > 0 && (
-            <div className="mt-8 px-6">
+            <div className="mt-6 px-6">
               <h3 className="text-xs font-semibold text-text-tertiary dark:text-text-dark-tertiary uppercase tracking-wider mb-3 px-4">
                 Administration
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {adminMenuItems.map((item) => {
                   const Icon = item.icon;
                   return (
