@@ -224,7 +224,7 @@ const Products = () => {
             {currentProducts.map((product) => (
               <div key={product.id} className="group bg-surface dark:bg-surface-dark rounded-xl overflow-hidden shadow hover:shadow-lg transition-all duration-300 p-3 md:p-4">
                 <Link
-                  to={`/product/${product.id}`}
+                  to={product.groupId ? `/group/${product.groupId}` : `/product/${product.id}`}
                   className="block"
                 >
                   <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -235,6 +235,12 @@ const Products = () => {
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300" />
+                    {/* Variant count indicator for grouped products */}
+                    {product.groupId && product.variantCount > 1 && (
+                      <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded-full font-medium">
+                        {product.variantCount} options
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <div className="min-h-[2.5rem]">
@@ -254,12 +260,12 @@ const Products = () => {
                     </div>
                   </div>
                 </Link>
-                <Link to={`/product/${product.id}`} className="w-full block mt-3">
+                <Link to={product.groupId ? `/group/${product.groupId}` : `/product/${product.id}`} className="w-full block mt-3">
                   <div className="w-full bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-dark active:bg-primary transition-all duration-300 text-sm font-medium flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12h.01M12 12h.01M9 12h.01" />
                     </svg>
-                    <span>View a product</span>
+                    <span>{product.groupId ? 'View Options' : 'View Product'}</span>
                   </div>
                 </Link>
               </div>

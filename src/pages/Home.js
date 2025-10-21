@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import {
   Search
@@ -10,6 +11,7 @@ import {
 const Home = () => {
   const [products, setProducts] = useState([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -110,105 +112,14 @@ const Home = () => {
     return Array.from(map.values());
   }, [categories, products]);
 
-  // Optimized touch/swipe handling with inertia and smooth scrolling
-  const handleTouchStart = (e, categoryId) => {
-    const touch = e.touches[0];
+  // Simplified smooth scrolling for better mobile performance
+  const scrollToItem = (direction, categoryId) => {
     const container = scrollRefs.current[categoryId];
     if (!container) return;
 
-    scrollRefs.current[`${categoryId}_startX`] = touch.clientX;
-    scrollRefs.current[`${categoryId}_startTime`] = Date.now();
-    scrollRefs.current[`${categoryId}_startScrollLeft`] = container.scrollLeft;
-    scrollRefs.current[`${categoryId}_lastX`] = touch.clientX;
-    scrollRefs.current[`${categoryId}_velocity`] = 0;
-
-    // Clear any ongoing animation
-    if (scrollRefs.current[`${categoryId}_animationFrame`]) {
-      cancelAnimationFrame(scrollRefs.current[`${categoryId}_animationFrame`]);
-    }
-  };
-
-  const handleTouchMove = (e, categoryId) => {
-    const touch = e.touches[0];
-    const container = scrollRefs.current[categoryId];
-    if (!container || !scrollRefs.current[`${categoryId}_startX`]) return;
-
-    e.preventDefault(); // Prevent page scroll while swiping
-
-    const x = touch.clientX;
-    const deltaX = scrollRefs.current[`${categoryId}_lastX`] - x;
-    const timeDelta = Date.now() - scrollRefs.current[`${categoryId}_startTime`];
-    
-    // Calculate velocity (pixels per millisecond)
-    if (timeDelta > 0) {
-      scrollRefs.current[`${categoryId}_velocity`] = deltaX / timeDelta;
-    }
-
-    container.scrollLeft += deltaX;
-    scrollRefs.current[`${categoryId}_lastX`] = x;
-  };
-
-  const handleTouchEnd = (categoryId) => {
-    const container = scrollRefs.current[categoryId];
-    if (!container) return;
-
-    const velocity = scrollRefs.current[`${categoryId}_velocity`] || 0;
-    const decay = 0.95; // Velocity decay factor
-    const maxAnimationTime = 1000; // Maximum animation duration in ms
-    const startTime = Date.now();
-
-    // Implement inertial scrolling
-    const animateScroll = () => {
-      const elapsed = Date.now() - startTime;
-      if (Math.abs(velocity) > 0.01 && elapsed < maxAnimationTime) {
-        container.scrollLeft += velocity * 16; // 16ms is approx. one frame
-        scrollRefs.current[`${categoryId}_velocity`] *= decay;
-        scrollRefs.current[`${categoryId}_animationFrame`] = requestAnimationFrame(animateScroll);
-      } else {
-        // Snap to nearest item
-        const itemWidth = 224; // 220px width + 4px gap
-        const targetScroll = Math.round(container.scrollLeft / itemWidth) * itemWidth;
-        smoothScrollTo(container, targetScroll, 300);
-      }
-    };
-
-    if (Math.abs(velocity) > 0.01) {
-      scrollRefs.current[`${categoryId}_animationFrame`] = requestAnimationFrame(animateScroll);
-    } else {
-      // If velocity is too low, just snap to nearest item
-      const itemWidth = 224; // 220px width + 4px gap
-      const targetScroll = Math.round(container.scrollLeft / itemWidth) * itemWidth;
-      smoothScrollTo(container, targetScroll, 300);
-    }
-
-    // Clear touch tracking
-    scrollRefs.current[`${categoryId}_startX`] = null;
-    scrollRefs.current[`${categoryId}_startScrollLeft`] = null;
-    scrollRefs.current[`${categoryId}_lastX`] = null;
-    scrollRefs.current[`${categoryId}_velocity`] = 0;
-  };
-
-  // Smooth scroll animation helper
-  const smoothScrollTo = (element, to, duration) => {
-    const start = element.scrollLeft;
-    const change = to - start;
-    const startTime = performance.now();
-
-    const animateScroll = (currentTime) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Easing function
-      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
-      
-      element.scrollLeft = start + change * easeOutCubic(progress);
-
-      if (progress < 1) {
-        requestAnimationFrame(animateScroll);
-      }
-    };
-
-    requestAnimationFrame(animateScroll);
+    const itemWidth = 220; // Card width + gap
+    const scrollAmount = direction === 'left' ? -itemWidth : itemWidth;
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
   };
 
   // Check if product requires size selection
@@ -225,8 +136,8 @@ const Home = () => {
     }
 
     try {
-      // Use the existing cart functionality from Cart component
-      const cartRef = doc(db, 'carts', 'current-user-id'); // This should use actual user ID
+       // Use the existing cart functionality from Cart component
+       const cartRef = doc(db, 'carts', user?.uid || 'guest');
       const itemsRef = collection(cartRef, 'items');
 
       // For products without size requirements, check if item exists
@@ -406,31 +317,32 @@ return (
 
               <div
                 ref={(el) => (scrollRefs.current[category.id] = el)}
-                className="flex space-x-4 overflow-x-auto pb-2 scroll-smooth -mx-3 px-3 scroll-pl-3 snap-x snap-mandatory will-change-scroll overscroll-x-contain"
-                onTouchStart={(e) => handleTouchStart(e, category.id)}
-                onTouchMove={(e) => handleTouchMove(e, category.id)}
-                onTouchEnd={() => handleTouchEnd(category.id)}
+                className="flex gap-4 overflow-x-auto pb-4 -mx-3 px-3 scroll-smooth snap-x snap-mandatory scrollbar-hide product-showcase-container"
               >
                 {categoryProducts.slice(0, ITEMS_PER_CATEGORY).map((item) => (
-                  <div key={item.id} className="min-w-[220px] w-56 flex-shrink-0 snap-start group bg-surface dark:bg-surface-dark rounded-xl overflow-hidden shadow hover:shadow-lg transition-all duration-300 p-3 md:p-4">
+                  <div key={item.id} className="w-[200px] md:w-[220px] flex-shrink-0 snap-start group bg-surface dark:bg-surface-dark rounded-xl overflow-hidden shadow hover:shadow-lg transition-all duration-300 product-card-horizontal">
                     {item.isGroup ? (
-                      <a href={`/group/${item.id}`} className="block">
+                      <Link to={`/group/${item.id}`} className="block">
                         <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                           <img src={item.image} alt={item.name} className="object-cover w-full h-full transition-all duration-500 group-hover:scale-110" loading="lazy" />
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300" />
+                          {/* Variant count indicator */}
+                          <div className="absolute top-2 right-2 bg-primary text-white text-xs px-2 py-1 rounded-full font-medium">
+                            {item.variantCount} options
+                          </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="min-h-[2.5rem]">
                             <h3 className="text-sm md:text-base font-medium text-text dark:text-text-dark line-clamp-2 group-hover:text-primary transition-colors duration-300">
-                              {item.name} ({item.variantCount})
+                              {item.name}
                             </h3>
                           </div>
                           <div className="flex items-end justify-between">
                             <span className="block text-primary font-bold text-base md:text-lg">From TZS {parseFloat(item.price).toLocaleString()}</span>
                           </div>
                         </div>
-                      </a>
+                      </Link>
                     ) : (
                       <Link to={`/product/${item.id}`} className="block">
                         <div className="relative aspect-[4/5] mb-3 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -491,10 +403,10 @@ return (
                 ))}
 
                 {categoryProducts.length > ITEMS_PER_CATEGORY && (
-                  <div className="min-w-[220px] w-56 flex-shrink-0 flex items-center justify-center rounded-xl border-2 border-dashed border-border/40 bg-white/60 dark:bg-surface-dark p-4">
-                    <Link to={`/products?category=${category.id}`} className="text-sm font-semibold text-primary">View All</Link>
-                  </div>
-                )}
+                   <div className="w-[200px] md:w-[220px] flex-shrink-0 flex items-center justify-center rounded-xl border-2 border-dashed border-border/40 bg-white/60 dark:bg-surface-dark p-4 product-card-horizontal">
+                     <Link to={`/products?category=${category.id}`} className="text-sm font-semibold text-primary">View All</Link>
+                   </div>
+                 )}
                </div>
              </section>
            );
