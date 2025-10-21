@@ -7,6 +7,7 @@ import {
   UserIcon,
   ShoppingBagIcon,
   HeartIcon,
+  ClipboardDocumentListIcon,
   ArrowRightOnRectangleIcon,
   Cog6ToothIcon
 } from '@heroicons/react/24/outline';

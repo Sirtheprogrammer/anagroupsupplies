@@ -67,6 +67,7 @@ const AppContent = ({ isSidebarOpen, setIsSidebarOpen }) => {
             <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+            <Route path="/orders/:orderId" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
             <Route path="/admin/*" element={<ProtectedRoute adminOnly><AdminRoutes /></ProtectedRoute>} />
             <Route path="/login" element={<Login />} />
