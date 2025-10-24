@@ -117,7 +117,7 @@ const AdminUsers = () => {
   }
 
   // paginated users fetch
-  async function fetchUsers(reset = true) {
+  const fetchUsers = useCallback(async (reset = true) => {
     try {
       setLoading(true);
       if (reset) {
@@ -150,12 +150,12 @@ const AdminUsers = () => {
     } finally {
       setLoading(false);
     }
-  }
+  }, []); // No dependencies since it doesn't rely on external state
 
   // Run initial load
   useEffect(() => {
     fetchUsers(true);
-  }, [fetchUsers]);
+  }, []); // Empty dependency array to run only once on mount
 
   // Re-run filtering when input/state values change
   useEffect(() => {
