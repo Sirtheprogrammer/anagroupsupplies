@@ -3,6 +3,12 @@ import { Link } from 'react-router-dom';
 import { getProducts, deleteProduct } from '../firebase/index';
 import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 
+// format currency to Tanzanian Shillings (TZS)
+const formatCurrency = (amount) => {
+  const value = Number(amount) || 0;
+  return new Intl.NumberFormat('en-TZ', { style: 'currency', currency: 'TZS' }).format(value);
+};
+
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +65,7 @@ const AdminProducts = () => {
             {products.map(product => (
               <tr key={product.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{product.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.price}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatCurrency(product.price)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <Link to={`/admin/products/edit/${product.id}`} className="text-primary hover:text-secondary mr-4">
                     <PencilIcon className="h-5 w-5" />
@@ -77,4 +83,4 @@ const AdminProducts = () => {
   );
 };
 
-export default AdminProducts; 
+export default AdminProducts;
