@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { toast } from 'react-toastify';
 import {
@@ -10,15 +10,8 @@ import {
   ShoppingBagIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  EyeIcon,
   ArrowPathIcon,
-  MapPinIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  UserIcon,
-  CalendarIcon,
-  CurrencyDollarIcon,
-  DocumentTextIcon
+  UserIcon
 } from '@heroicons/react/24/outline';
 
 const AdminOrders = () => {

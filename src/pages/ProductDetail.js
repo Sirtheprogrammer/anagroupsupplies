@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, setDoc, collection, updateDoc, getDocs, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, updateDoc, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
