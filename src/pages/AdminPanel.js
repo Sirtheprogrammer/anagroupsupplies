@@ -90,6 +90,23 @@ const AdminPanel = () => {
         totalCategories: categoriesCountSnap.data().count || 0,
         activeUsers: activeUsersCount
       };
+
+      // fetch order counts to display accurate order metrics on the dashboard
+      try {
+        const ordersCountSnap = await getCountFromServer(query(collection(db, 'orders')));
+        const pendingOrdersSnap = await getCountFromServer(query(collection(db, 'orders'), where('status', '==', 'pending')));
+        const deliveredOrdersSnap = await getCountFromServer(query(collection(db, 'orders'), where('status', '==', 'delivered')));
+
+        quick.totalOrders = ordersCountSnap.data().count || 0;
+        quick.pendingOrders = pendingOrdersSnap.data().count || 0;
+        quick.completedOrders = deliveredOrdersSnap.data().count || 0;
+      } catch (err) {
+        console.warn('Order counts aggregation failed:', err);
+        quick.totalOrders = quick.totalOrders || 0;
+        quick.pendingOrders = quick.pendingOrders || 0;
+        quick.completedOrders = quick.completedOrders || 0;
+      }
+
       setStats(prev => ({ ...prev, ...quick }));
 
       // cache quick results (in-memory + localStorage)
@@ -684,20 +701,18 @@ const AdminPanel = () => {
                       {feature.trend === 'up' && (
                         <ArrowUpIcon className="h-3 w-3 text-green-500 mr-1" />
                       )}
-                      {feature.trend === 'warning' && (
-                        <ExclamationTriangleIcon className="h-3 w-3 text-orange-500 mr-1" />
+                      {feature.trend === 'down' && (
+                        <ArrowUpIcon className="h-3 w-3 text-red-500 mr-1 transform rotate-180" />
                       )}
-                      <span className={`text-xs truncate ${
-                        feature.trend === 'up' ? 'text-green-600' :
-                        feature.trend === 'warning' ? 'text-orange-600' :
-                        'text-gray-600 dark:text-gray-400'
-                      }`}>
+                      {feature.trend === 'neutral' && (
+                        <ExclamationTriangleIcon className="h-3 w-3 text-yellow-500 mr-1" />
+                      )}
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
                         {feature.recent}
                       </span>
                     </div>
                   </div>
                 </div>
-                <EyeIcon className="h-4 w-4 md:h-5 md:w-5 text-gray-400 flex-shrink-0 ml-2" />
               </div>
             </Link>
           ))}
