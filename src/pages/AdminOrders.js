@@ -29,6 +29,13 @@ const AdminOrders = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -88,10 +95,13 @@ const AdminOrders = () => {
         updatedAt: new Date().toISOString()
       });
 
-      // Update local state
+      // Update local orders list
       setOrders(prev => prev.map(order =>
         order.id === orderId ? { ...order, status: newStatus, updatedAt: new Date().toISOString() } : order
       ));
+
+      // If the selected order is the one updated, update it too so UI reflects change immediately
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, status: newStatus, updatedAt: new Date().toISOString() } : prev);
 
       toast.success('Order status updated successfully');
     } catch (error) {
@@ -300,8 +310,8 @@ const AdminOrders = () => {
           )}
         </div>
 
-        {/* Order Details */}
-        {selectedOrder && (
+        {/* Order Details (desktop) */}
+        {!isMobile && selectedOrder && (
           <div className="bg-white dark:bg-surface-dark rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-start mb-6">
               <div>
@@ -399,133 +409,110 @@ const AdminOrders = () => {
                     </div>
                     <div>
                       <span className="font-medium text-gray-700 dark:text-gray-300">Phone:</span>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1 flex items-center">
-                        <PhoneIcon className="h-4 w-4 mr-1" />
-                        {selectedOrder.shippingDetails?.phone || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Email:</span>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1 flex items-center">
-                        <EnvelopeIcon className="h-4 w-4 mr-1" />
-                        {selectedOrder.shippingDetails?.email || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">User ID:</span>
-                      <p className="text-gray-600 dark:text-gray-400 mt-1 font-mono text-xs">
-                        {selectedOrder.userId || 'N/A'}
-                      </p>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedOrder.shippingDetails?.phone || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Shipping Quote Information */}
-              {selectedOrder.shippingQuote && (
-                <div>
-                  <h3 className="font-medium mb-4 text-gray-900 dark:text-white flex items-center">
-                    <CurrencyDollarIcon className="h-5 w-5 mr-2" />
-                    Shipping Quote
-                  </h3>
-                  <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Provider:</span>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedOrder.shippingQuote.provider || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Cost:</span>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">{formatPrice(selectedOrder.shippingQuote.cost || 0)}</p>
-                      </div>
-                      <div className="md:col-span-2">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Estimated Delivery:</span>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">
-                          {selectedOrder.shippingQuote.estimatedDays
-                            ? `${selectedOrder.shippingQuote.estimatedDays} days`
-                            : 'N/A'
-                          }
-                        </p>
-                      </div>
-                      {selectedOrder.shippingQuote.trackingNumber && (
-                        <div className="md:col-span-2">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">Tracking Number:</span>
-                          <p className="text-gray-600 dark:text-gray-400 mt-1 font-mono">
-                            {selectedOrder.shippingQuote.trackingNumber}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Shipping Details */}
-              <div>
-                <h3 className="font-medium mb-4 text-gray-900 dark:text-white flex items-center">
-                  <MapPinIcon className="h-5 w-5 mr-2" />
-                  Shipping Address
-                </h3>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  <p>{selectedOrder.shippingDetails?.streetAddress || 'N/A'}</p>
-                  <p>{selectedOrder.shippingDetails?.city || 'N/A'}, {selectedOrder.shippingDetails?.state || ''} {selectedOrder.shippingDetails?.postalCode || ''}</p>
-                  <p>{selectedOrder.shippingDetails?.country || 'N/A'}</p>
-                </div>
-              </div>
-
-              {/* Order Timeline */}
-              <div>
-                <h3 className="font-medium mb-4 text-gray-900 dark:text-white flex items-center">
-                  <CalendarIcon className="h-5 w-5 mr-2" />
-                  Order Timeline
-                </h3>
-                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                  <p>📅 Created: {formatDate(selectedOrder.createdAt)}</p>
-                  {selectedOrder.updatedAt && (
-                    <p>🔄 Last Updated: {formatDate(selectedOrder.updatedAt)}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Additional Notes */}
-              {(selectedOrder.notes || selectedOrder.specialInstructions) && (
-                <div>
-                  <h3 className="font-medium mb-4 text-gray-900 dark:text-white flex items-center">
-                    <DocumentTextIcon className="h-5 w-5 mr-2" />
-                    Additional Information
-                  </h3>
-                  <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4">
-                    {selectedOrder.notes && (
-                      <div className="mb-3">
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Order Notes:</span>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedOrder.notes}</p>
-                      </div>
-                    )}
-                    {selectedOrder.specialInstructions && (
-                      <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Special Instructions:</span>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedOrder.specialInstructions}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Additional Notes */}
-              {selectedOrder.notes && (
-                <div>
-                  <h3 className="font-medium mb-2 text-gray-900 dark:text-white">Order Notes</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                    {selectedOrder.notes}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-};
 
-export default AdminOrders; 
+        {/* Mobile bottom-sheet order details */}
+        {isMobile && selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-end lg:hidden">
+            <div className="absolute inset-0 bg-black bg-opacity-40" onClick={() => setSelectedOrder(null)} />
+            <div className="relative w-full max-h-[90vh] bg-white dark:bg-surface-dark rounded-t-lg shadow-lg overflow-auto">
+              <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order #{selectedOrder.id.slice(-8)}</h3>
+                <button onClick={() => setSelectedOrder(null)} className="text-gray-600 dark:text-gray-300">Close</button>
+              </div>
+              <div className="p-4 space-y-4">
+                {/* reuse key details: status selector and brief items */}
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Placed on {formatDate(selectedOrder.createdAt)}</p>
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
+                    disabled={updatingStatus}
+                    className="rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white disabled:opacity-50"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div className="space-y-3">
+                  {selectedOrder.items?.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+                        {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <ShoppingBagIcon className="h-6 w-6 text-gray-400" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white truncate">{item.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Qty: {item.quantity} • {item.sizingType === 'numeric' ? 'EU Size' : 'Size'} {item.selectedSize || '-'}</div>
+                      </div>
+                      <div className="font-medium text-primary">{formatPrice(item.price * item.quantity)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400">Customer</div>
+                      <div className="font-medium text-gray-900 dark:text-white">{selectedOrder.shippingDetails?.fullName || 'N/A'}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{selectedOrder.shippingDetails?.email || 'N/A'}</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{selectedOrder.shippingDetails?.phone || 'N/A'}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-gray-600 dark:text-gray-400">Shipping Address</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedOrder.shippingDetails?.streetAddress || ''}
+                        {selectedOrder.shippingDetails?.city ? `, ${selectedOrder.shippingDetails.city}` : ''}
+                        {selectedOrder.shippingDetails?.state ? `, ${selectedOrder.shippingDetails.state}` : ''}
+                        {selectedOrder.shippingDetails?.postalCode ? `, ${selectedOrder.shippingDetails.postalCode}` : ''}
+                        {selectedOrder.shippingDetails?.country ? `, ${selectedOrder.shippingDetails.country}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                  <div className="flex justify-between text-base font-semibold text-gray-900 dark:text-white">
+                    <span>Total</span>
+                    <span className="text-primary">{formatPrice(selectedOrder.total)}</span>
+                  </div>
+                </div>
+
+                {/* Only status dropdown for updates on mobile - no extra buttons */}
+                <div className="mt-4">
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Status</label>
+                  <select
+                    value={selectedOrder.status}
+                    onChange={(e) => updateOrderStatus(selectedOrder.id, e.target.value)}
+                    disabled={updatingStatus}
+                    className="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-primary dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                
+               </div>
+             </div>
+           </div>
+         )}
+       </div>
+     </div>
+   );
+ };
+ 
+ export default AdminOrders;
