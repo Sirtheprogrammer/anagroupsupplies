@@ -105,8 +105,10 @@ service cloud.firestore {
       let item = request.resource.data;
       return item.productId is string &&
         item.quantity is number && item.quantity > 0 &&
-        item.price is number && item.price >= 0 &&
-        ((item.selectedSize is string) || !item.keys().hasAny(['selectedSize'])) &&
+        // price may be a number or a numeric string
+        (item.price is number || (item.price is string && item.price.matches('^[0-9]+(\\.[0-9]+)?$'))) &&
+        // selectedSize can be a string, null, or absent
+        ((item.selectedSize is string) || item.selectedSize == null || !item.keys().hasAny(['selectedSize'])) &&
         ((item.sizingType is string) || !item.keys().hasAny(['sizingType']));
     }
 

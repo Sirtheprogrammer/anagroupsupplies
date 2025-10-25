@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, setDoc, collection, updateDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, updateDoc, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -126,7 +126,7 @@ const ProductDetail = () => {
       return;
     }
 
-    // Check if size selection is required but not selected
+    // Ensure size requirement
     const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
     if (requiresSizeSelection(currentProduct) && !selectedSize) {
       toast.error(`Please select ${getSizeTypeLabel(currentProduct).toLowerCase()} first`);
@@ -136,21 +136,42 @@ const ProductDetail = () => {
 
     try {
       const selected = currentProduct;
-      const cartItemRef = doc(db, `carts/${user.uid}/items`, selected.id);
+      const cartDocRef = doc(db, 'carts', user.uid);
+      const itemsRef = collection(cartDocRef, 'items');
 
-      await setDoc(cartItemRef, {
-        productId: selected.id,
-        groupId: selected.groupId || null,
-        name: selected.name,
-        price: selected.price,
-        image: selected.image,
-        selectedSize: selectedSize || null,
-        sizingType: selected.sizingType || 'none',
-        quantity: quantity,
-        addedAt: new Date().toISOString()
-      }, { merge: true });
+      // Try to find an existing item with same productId and size
+      const existingSnapshot = await getDocs(itemsRef);
+      const sizeKey = selectedSize || null;
+      const existing = existingSnapshot.docs.find(d => {
+        const data = d.data();
+        return data.productId === selected.id && (data.selectedSize || null) === sizeKey;
+      });
 
-      toast.success('Added to cart successfully');
+      if (existing) {
+        // Increment quantity instead of overwriting
+        const currentQty = Number(existing.data().quantity) || 0;
+        await updateDoc(existing.ref, {
+          quantity: currentQty + Number(quantity || 1),
+          addedAt: new Date().toISOString()
+        });
+        toast.success('Updated quantity in cart');
+      } else {
+        // Add new item document
+        const newItem = {
+          productId: selected.id,
+          groupId: selected.groupId || null,
+          name: selected.name,
+          price: selected.price,
+          image: selected.image,
+          selectedSize: sizeKey,
+          sizingType: selected.sizingType || 'none',
+          quantity: Number(quantity || 1),
+          addedAt: new Date().toISOString()
+        };
+
+        await addDoc(itemsRef, newItem);
+        toast.success('Added to cart successfully');
+      }
     } catch (error) {
       console.error('Error adding to cart:', error);
       toast.error('Failed to add to cart');
@@ -164,7 +185,6 @@ const ProductDetail = () => {
       return;
     }
 
-    // Check if size selection is required but not selected
     const currentProduct = variants && variants.length > 0 ? variants[selectedVariantIndex] : product;
     if (requiresSizeSelection(currentProduct) && !selectedSize) {
       toast.error(`Please select ${getSizeTypeLabel(currentProduct).toLowerCase()} first`);
@@ -174,20 +194,34 @@ const ProductDetail = () => {
 
     try {
       const selected = currentProduct;
-      const wishlistItemRef = doc(db, `wishlists/${user.uid}/items`, selected.id);
+      const wishlistDocRef = doc(db, 'wishlists', user.uid);
+      const itemsRef = collection(wishlistDocRef, 'items');
 
-      await setDoc(wishlistItemRef, {
-        productId: selected.id,
-        groupId: selected.groupId || null,
-        name: selected.name,
-        price: selected.price,
-        image: selected.image,
-        selectedSize: selectedSize || null,
-        sizingType: selected.sizingType || 'none',
-        addedAt: new Date().toISOString()
-      }, { merge: true });
+      // Prevent duplicate wishlist entries (same product + size)
+      const existingSnapshot = await getDocs(itemsRef);
+      const sizeKey = selectedSize || null;
+      const existing = existingSnapshot.docs.find(d => {
+        const data = d.data();
+        return data.productId === selected.id && (data.selectedSize || null) === sizeKey;
+      });
 
-      toast.success('Added to wishlist successfully');
+      if (existing) {
+        toast.info('Item already in wishlist');
+      } else {
+        const wishlistItem = {
+          productId: selected.id,
+          groupId: selected.groupId || null,
+          name: selected.name,
+          price: selected.price,
+          image: selected.image,
+          selectedSize: sizeKey,
+          sizingType: selected.sizingType || 'none',
+          addedAt: new Date().toISOString()
+        };
+
+        await addDoc(itemsRef, wishlistItem);
+        toast.success('Added to wishlist successfully');
+      }
     } catch (error) {
       console.error('Error adding to wishlist:', error);
       toast.error('Failed to add to wishlist');
@@ -658,4 +692,4 @@ const ProductDetail = () => {
   );
 };
 
-export default ProductDetail; 
+export default ProductDetail;
