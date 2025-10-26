@@ -21,6 +21,21 @@ import {
   ArrowPathIcon,
   PhoneIcon
 } from '@heroicons/react/24/outline';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { format, addDays, differenceInCalendarDays, startOfDay } from 'date-fns';
+
+// register chart components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const AdminPanel = () => {
   const [stats, setStats] = useState({
@@ -42,6 +57,8 @@ const AdminPanel = () => {
   const [timeRange, setTimeRange] = useState('30d');
   const [recentActivities, setRecentActivities] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('255683568254');
+  const [registrationData, setRegistrationData] = useState(null);
+  const [regLoading, setRegLoading] = useState(false);
   const intervalRef = useRef(null);
   const isFetchingRef = useRef(false);
   const lastRefreshRef = useRef(0);
@@ -253,6 +270,68 @@ const AdminPanel = () => {
     }
   }, []);
 
+  // Fetch user registration counts over the selected timeRange (daily buckets)
+  const fetchRegistrationTrends = useCallback(async () => {
+    setRegLoading(true);
+    try {
+      const now = new Date();
+      let days = 30;
+      if (timeRange === '7d') days = 7;
+      else if (timeRange === '90d') days = 90;
+
+      const startDate = startOfDay(addDays(now, - (days - 1)));
+
+      const usersQuery = query(collection(db, 'users'), where('createdAt', '>=', startDate), orderBy('createdAt', 'asc'));
+      const snap = await getDocs(usersQuery);
+
+      // build counts map keyed by ISO date string (yyyy-MM-dd) for consistency
+      const counts = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        let created = data.createdAt;
+        let dateObj = null;
+        if (created && typeof created.toDate === 'function') {
+          dateObj = created.toDate();
+        } else if (typeof created === 'string' || typeof created === 'number') {
+          dateObj = new Date(created);
+        }
+        if (!dateObj || isNaN(dateObj.getTime())) return;
+        const key = format(startOfDay(dateObj), 'yyyy-MM-dd');
+        counts[key] = (counts[key] || 0) + 1;
+      });
+
+      // Build labels for each day from startDate -> now
+      const totalDays = differenceInCalendarDays(startOfDay(now), startOfDay(startDate)) + 1;
+      const labels = [];
+      const values = [];
+      for (let i = 0; i < totalDays; i++) {
+        const day = startOfDay(addDays(startDate, i));
+        const key = format(day, 'yyyy-MM-dd');
+        labels.push(format(day, 'MMM d'));
+        values.push(counts[key] || 0);
+      }
+
+      setRegistrationData({
+        labels,
+        datasets: [
+          {
+            label: 'Registrations',
+            data: values,
+            fill: true,
+            backgroundColor: 'rgba(16,185,129,0.12)',
+            borderColor: 'rgba(16,185,129,1)',
+            tension: 0.3,
+            pointRadius: 3
+          }
+        ]
+      });
+    } catch (err) {
+      console.error('Error fetching registration trends:', err);
+    } finally {
+      setRegLoading(false);
+    }
+  }, [timeRange]);
+
   // Fetch all dashboard data (function declaration)
   const fetchAllData = useCallback(async () => {
     if (isFetchingRef.current) return; // prevent overlapping
@@ -316,6 +395,11 @@ const AdminPanel = () => {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [fetchAllData, fetchRealTimeMetrics]);
+
+  // ensure registration data is fetched when timeRange changes
+  useEffect(() => {
+    fetchRegistrationTrends().catch(err => console.error(err));
+  }, [fetchRegistrationTrends]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-TZ', {
@@ -663,12 +747,31 @@ const AdminPanel = () => {
         {/* User Registration Chart */}
         <div className="bg-white dark:bg-surface-dark rounded-lg shadow p-4 md:p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">User Registration Trends</h3>
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-center">
-              <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">Chart visualization would go here</p>
-              <p className="text-sm text-gray-400 mt-2">Integration with charting library needed</p>
-            </div>
+          <div className="h-64">
+            {regLoading || !registrationData ? (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <ChartBarIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">Loading registration data...</p>
+                </div>
+              </div>
+            ) : (
+              <Line
+                data={registrationData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { position: 'top' },
+                    title: { display: false }
+                  },
+                  scales: {
+                    x: { grid: { display: false } },
+                    y: { beginAtZero: true }
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
 
