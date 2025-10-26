@@ -233,9 +233,15 @@ service cloud.firestore {
       
       match /items/{itemId} {
         allow read: if isOwner(userId);
+        // Accept selectedSize as a string OR explicit null OR absent (client may send null)
+        // Validate productId and addedAt present. Also ensure referenced product exists.
         allow create, update: if isOwner(userId) &&
                              request.resource.data.keys().hasAll(['productId', 'addedAt']) &&
-                             ((request.resource.data.selectedSize is string) || !request.resource.data.keys().hasAny(['selectedSize']));
+                             ((request.resource.data.selectedSize is string) || request.resource.data.selectedSize == null || !request.resource.data.keys().hasAny(['selectedSize'])) &&
+                             // price and quantity are optional for wishlist, but if present ensure valid types
+                             (!request.resource.data.keys().hasAny(['price']) || (request.resource.data.price is number || (request.resource.data.price is string && request.resource.data.price.matches('^[0-9]+(\\.[0-9]+)?$')))) &&
+                             // ensure the referenced product exists (prevents writing wishlist for non-existent product)
+                             exists(/databases/$(database)/documents/products/$(request.resource.data.productId));
         allow delete: if isOwner(userId);
       }
     }

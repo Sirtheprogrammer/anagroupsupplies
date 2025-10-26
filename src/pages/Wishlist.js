@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -49,6 +49,42 @@ const Wishlist = () => {
     }
   };
 
+  // Move a wishlist item to the user's cart then remove it from wishlist
+  const moveToCart = async (item) => {
+    if (!user) {
+      toast.error('Please login to add items to cart');
+      return;
+    }
+
+    try {
+      const cartDocRef = doc(db, 'carts', user.uid);
+      const itemsRef = collection(cartDocRef, 'items');
+
+      // Build a cart item matching isValidCartItem() in security rules
+      const cartItem = {
+        productId: item.productId || item.productId === 0 ? item.productId : item.id,
+        quantity: 1,
+        price: (item.price !== undefined && item.price !== null) ? Number(item.price) : 0,
+        selectedSize: item.selectedSize || null,
+        sizingType: item.sizingType || 'none',
+        name: item.name || '',
+        image: item.image || '',
+        addedAt: new Date().toISOString()
+      };
+
+      await addDoc(itemsRef, cartItem);
+
+      // Remove from wishlist after successful add
+      await deleteDoc(doc(db, 'wishlists', user.uid, 'items', item.id));
+
+      toast.success('Moved to cart and removed from wishlist');
+      fetchWishlist();
+    } catch (error) {
+      console.error('Error moving item to cart:', error);
+      toast.error('Failed to move item to cart');
+    }
+  };
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -77,14 +113,14 @@ const Wishlist = () => {
           <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
             {wishlist.map((item) => (
               <div key={item.id} className="bg-white dark:bg-surface-dark rounded-lg shadow-md overflow-hidden">
-                <Link to={`/product/${item.id}`}>
+                <Link to={`/product/${item.productId || item.id}`}>
                   <img src={item.image} alt={item.name} className="w-full h-48 object-cover" />
                 </Link>
                 <div className="p-4">
-                  <Link to={`/product/${item.id}`}>
+                  <Link to={`/product/${item.productId || item.id}`}>
                     <h2 className="text-lg font-semibold text-gray-800 dark:text-white truncate">{item.name}</h2>
                   </Link>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">TZS {parseFloat(item.price).toLocaleString()}</p>
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">TZS {parseFloat(item.price || 0).toLocaleString()}</p>
                   <div className="mt-4 flex items-center justify-between">
                     <button
                       onClick={() => removeFromWishlist(item.id)}
@@ -92,7 +128,7 @@ const Wishlist = () => {
                     >
                       Remove
                     </button>
-                    <button className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors duration-300">
+                    <button onClick={() => moveToCart(item)} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition-colors duration-300">
                       Add to Cart
                     </button>
                   </div>
@@ -105,12 +141,12 @@ const Wishlist = () => {
           <div className="md:hidden space-y-3">
             {wishlist.map((item) => (
               <div key={item.id} className="flex items-center bg-white dark:bg-surface-dark rounded-lg shadow p-3">
-                <Link to={`/product/${item.id}`} className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
+                <Link to={`/product/${item.productId || item.id}`} className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                 </Link>
 
                 <div className="flex-1 min-w-0 ml-3">
-                  <Link to={`/product/${item.id}`} className="block">
+                  <Link to={`/product/${item.productId || item.id}`} className="block">
                     <h2 className="text-sm font-semibold text-gray-800 dark:text-white truncate">{item.name}</h2>
                   </Link>
                   <div className="mt-1 flex items-center justify-between">
@@ -124,6 +160,7 @@ const Wishlist = () => {
                         Remove
                       </button>
                       <button
+                        onClick={() => moveToCart(item)}
                         className="bg-primary text-white text-sm px-3 py-1.5 rounded-md"
                         aria-label={`Add ${item.name} to cart`}
                       >
