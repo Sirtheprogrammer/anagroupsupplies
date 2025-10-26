@@ -107,6 +107,33 @@ const AdminPanel = () => {
         quick.completedOrders = quick.completedOrders || 0;
       }
 
+      // Compute total revenue from orders with status 'delivered'
+      let computedRevenue = 0;
+      try {
+        // Note: this performs a client-side aggregation by fetching delivered orders.
+        // For large datasets consider a Cloud Function to maintain an aggregate field instead.
+        const deliveredQuery = query(collection(db, 'orders'), where('status', '==', 'delivered'));
+        const deliveredSnapshot = await getDocs(deliveredQuery);
+        deliveredSnapshot.docs.forEach(d => {
+          const data = d.data();
+          const totalField = data.total;
+          let value = 0;
+          if (typeof totalField === 'number') {
+            value = totalField;
+          } else if (typeof totalField === 'string') {
+            // accept numeric strings like '12345' or '12345.67'
+            const m = totalField.match(/^\s*([0-9]+(\.[0-9]+)?)\s*$/);
+            if (m) value = parseFloat(m[1]);
+          }
+          if (!isNaN(value)) computedRevenue += Number(value);
+        });
+      } catch (err) {
+        console.warn('Failed to compute total revenue from delivered orders:', err);
+      }
+
+      // include revenue in quick stats
+      quick.totalRevenue = computedRevenue || 0;
+
       setStats(prev => ({ ...prev, ...quick }));
 
       // cache quick results (in-memory + localStorage)
