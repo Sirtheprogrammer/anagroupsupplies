@@ -6,11 +6,13 @@ import AddProduct from './AddProduct';
 import EditProduct from './EditProduct';
 import AdminOrders from './AdminOrders';
 import AdminCategories from './AdminCategories';
+import SystemStatus from './SystemStatus';
 
 const AdminRoutes = () => {
   return (
     <Routes>
       <Route path="" element={<AdminPanel />} />
+      <Route path="system" element={<SystemStatus />} />
       <Route path="products" element={<AdminProducts />} />
       <Route path="categories" element={<AdminCategories />} />
       <Route path="products/add" element={<AddProduct />} />

@@ -19,6 +19,13 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const auth = getAuth();
+  // refs to avoid re-subscribing in onAuthStateChanged when loading/user change
+  const loadingRef = { current: loading };
+  const userRef = { current: user };
+
+  // keep refs in sync with state without affecting useEffect dependencies
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // Check if user is admin
   const checkAdminStatus = async (uid) => {
@@ -157,53 +164,70 @@ export const AuthProvider = ({ children }) => {
         
         if (firebaseUser) {
           try {
-            // Get user profile with timeout
+            // Start async ops in parallel
             const userDataPromise = getOrCreateUserProfile(firebaseUser);
             const adminCheckPromise = checkAdminStatus(firebaseUser.uid);
-            
-            // Use Promise.race to timeout these operations (increased timeout for better reliability)
-            const timeoutPromise = new Promise((_, reject) => {
-              timeoutId = setTimeout(() => {
-                console.warn('User setup timeout - this may be due to slow network or Firebase issues');
-                reject(new Error('User setup timeout - please check your connection and try again'));
-              }, 15000);
-            });
-            
-            const [userData, isAdmin] = await Promise.race([
-              Promise.all([userDataPromise, adminCheckPromise]),
-              timeoutPromise
+
+            // Fast admin detection: resolve admin check quickly (fallback to false after 2s)
+            const adminFast = await Promise.race([
+              adminCheckPromise,
+              new Promise((resolve) => setTimeout(() => resolve(false), 2000))
             ]);
-            
-            clearTimeout(timeoutId);
-            
-            // Enhanced user object
-            const enhancedUser = {
+
+            // Immediately expose a lightweight user object so admin UI can render quickly
+            setUser({
               ...firebaseUser,
-              ...userData,
-              isAdmin
-            };
+              isAdmin: !!adminFast,
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              email: firebaseUser.email
+            });
 
-            setUser(enhancedUser);
-            setUserProfile(userData);
-
-            // Set user in analytics service (non-blocking)
+            // Continue to await full profile and a definitive admin check (no timeout)
             try {
-              analyticsService.setUser(firebaseUser.uid);
-              
-              // Track login only if not initial load (non-blocking)
-              if (!loading) {
-                analyticsService.trackLogin(
-                  firebaseUser.uid,
-                  firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'email'
-                ).catch(err => console.warn('Analytics tracking failed:', err));
+              const [userData, isAdmin] = await Promise.all([
+                userDataPromise,
+                adminCheckPromise.catch((err) => {
+                  console.warn('Admin check failed after fast path, defaulting to false', err);
+                  return false;
+                })
+              ]);
+
+              const enhancedUser = {
+                ...firebaseUser,
+                ...userData,
+                isAdmin: !!isAdmin
+              };
+
+              setUser(enhancedUser);
+              setUserProfile(userData);
+
+              // Set user in analytics service (non-blocking)
+              try {
+                analyticsService.setUser(firebaseUser.uid);
+
+                // Track login only if not initial load (non-blocking)
+                if (!loading) {
+                  analyticsService.trackLogin(
+                    firebaseUser.uid,
+                    firebaseUser.providerData[0]?.providerId === 'google.com' ? 'google' : 'email'
+                  ).catch(err => console.warn('Analytics tracking failed:', err));
+                }
+              } catch (analyticsError) {
+                console.warn('Analytics setup failed:', analyticsError);
               }
-            } catch (analyticsError) {
-              console.warn('Analytics setup failed:', analyticsError);
+
+            } catch (innerErr) {
+              console.error('Error completing user setup:', innerErr);
+              // If full profile fails, keep lightweight user with isAdmin possibly true from fast check
+              setUser(prev => ({
+                ...prev,
+                isAdmin: prev?.isAdmin || false
+              }));
+              setUserProfile(null);
             }
-            
+
           } catch (error) {
-            console.error('Error setting up user:', error);
-            clearTimeout(timeoutId);
+            console.error('Error setting up user (fast path):', error);
 
             // Fallback to basic user object with better error handling
             setUser({
@@ -214,9 +238,9 @@ export const AuthProvider = ({ children }) => {
             });
             setUserProfile(null);
 
-            // Show user-friendly error message
-            if (error.message.includes('timeout')) {
-              console.warn('User setup timed out, but continuing with basic user object');
+            // Show user-friendly warning in console (don't block app)
+            if (error.message && error.message.includes('timeout')) {
+              console.warn('User setup timed out, continuing with basic user object');
             }
           }
         } else {
@@ -379,4 +403,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};
